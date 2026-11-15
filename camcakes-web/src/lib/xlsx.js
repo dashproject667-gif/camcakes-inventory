@@ -126,13 +126,7 @@ export async function patchXlsx(buffer, ops, opts = {}) {
   for (const sh of sheets) {
     const doc = parse(await zip.file(sh.path).async('string'));
     const sheetData = doc.getElementsByTagName('sheetData')[0];
-    // 1) quitar valores en caché de TODAS las fórmulas (se recalculan al abrir)
-    for (const c of Array.from(doc.getElementsByTagName('c'))) {
-      if (!kids(c, 'f').length) continue;
-      for (const v of kids(c, 'v')) c.removeChild(v);
-      c.removeAttribute('t');
-    }
-    // 2) vaciados y escrituras
+    // 1) vaciados y escrituras; las fórmulas y sus resultados guardados se conservan.
     if (touched.has(sh.name)) {
       for (const rg of (opts.clearRanges || {})[sh.name] || []) {
         for (let r = rg.rows[0]; r <= rg.rows[1]; r++) for (let cn = colToNum(rg.cols[0]); cn <= colToNum(rg.cols[1]); cn++) setCell(doc, sheetData, numToCol(cn) + r, null, sh.name);
@@ -141,23 +135,15 @@ export async function patchXlsx(buffer, ops, opts = {}) {
     }
     zip.file(sh.path, ser.serializeToString(doc));
   }
-  // 3) forzar recálculo completo al abrir
+  // 2) conservar los resultados visibles y pedir a Excel que recalcule los valores afectados.
   const wbXml = await zip.file('xl/workbook.xml').async('string');
   const wbDoc = parse(wbXml);
   let calc = wbDoc.getElementsByTagName('calcPr')[0];
   if (!calc) { calc = wbDoc.createElementNS(wbDoc.documentElement.namespaceURI, 'calcPr'); wbDoc.documentElement.appendChild(calc); }
+  calc.setAttribute('calcMode', 'auto');
   calc.setAttribute('fullCalcOnLoad', '1');
+  calc.setAttribute('forceFullCalc', '1');
   zip.file('xl/workbook.xml', ser.serializeToString(wbDoc));
-  if (zip.file('xl/calcChain.xml')) {
-    // la cadena de cálculo queda obsoleta al quitar cachés; Excel la reconstruye
-    zip.remove('xl/calcChain.xml');
-    let ct = await zip.file('[Content_Types].xml').async('string');
-    ct = ct.replace(/<Override[^>]*calcChain[^>]*\/>/, '');
-    zip.file('[Content_Types].xml', ct);
-    let rl = await zip.file('xl/_rels/workbook.xml.rels').async('string');
-    rl = rl.replace(/<Relationship[^>]*calcChain[^>]*\/>/, '');
-    zip.file('xl/_rels/workbook.xml.rels', rl);
-  }
   const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
   return { bytes, log };
 }
