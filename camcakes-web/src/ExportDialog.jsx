@@ -3,6 +3,7 @@ import { AppCtx } from './App.jsx';
 import { buildMonitor } from './lib/export.js';
 import { key } from './lib/engine.js';
 import { today } from './lib/format.js';
+import { AppIcon } from './ui.jsx';
 
 export default function ExportDialog({ onClose, changes }) {
   const { bufferRef, original, model, inventory, counts, notify } = useContext(AppCtx);
@@ -23,7 +24,7 @@ export default function ExportDialog({ onClose, changes }) {
   return (
     <div className="drawer-wrap center" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" role="dialog" aria-label="Exportar Monitor">
-        <header><h2>Exportar Monitor actualizado</h2><button className="icon-btn" onClick={onClose} aria-label="Cerrar">✕</button></header>
+        <header><h2>Exportar Monitor actualizado</h2><button className="icon-btn" onClick={onClose} aria-label="Cerrar"><AppIcon name="close" /></button></header>
         <p>Se regenera tu Monitor original conservando fórmulas, formatos y hojas; solo cambian las celdas de captura.</p>
         <ul className="changes">
           <li><strong>{c.insumos || 0}</strong> insumos modificados o agregados</li>
@@ -37,7 +38,7 @@ export default function ExportDialog({ onClose, changes }) {
           <span>Vaciar la hoja <strong>Ventas</strong> del Monitor (incluye las filas de ejemplo). Recomendado al cerrar periodo.</span></label>
         <p className="muted small">Excel recalcula todo al abrir el archivo. Las ventas del DOC no se escriben en el Monitor: se usan aquí para el teórico.</p>
         {err && <div className="fp-error" role="alert">{err}</div>}
-        <div className="modal-actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={go} disabled={busy}>{busy ? 'Generando…' : 'Descargar Monitor'}</button></div>
+        <div className="modal-actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={go} disabled={busy}>{busy ? 'Generando…' : <><AppIcon name="download" /> Descargar Monitor</>}</button></div>
       </div>
     </div>
   );

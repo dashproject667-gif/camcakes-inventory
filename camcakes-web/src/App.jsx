@@ -5,7 +5,7 @@ import { computeCosts, key, norm } from './lib/engine.js';
 import { computeSales, buildInventory, DEFAULT_IGNORED } from './lib/sales.js';
 import { summarizeChanges } from './lib/export.js';
 import { loadSession, saveSession } from './lib/session.js';
-import { FilePick } from './ui.jsx';
+import { AppIcon, FilePick } from './ui.jsx';
 import Menu from './Menu.jsx';
 import Costos from './Costos.jsx';
 import Inventario from './Inventario.jsx';
@@ -126,11 +126,11 @@ export default function App() {
         </nav>
         <div className="top-actions">
           <label className="chip file" title="Reemplazar Monitor">
-            <span>📄 {monitorName}</span>
+            <span><AppIcon name="file" /> {monitorName}</span>
             <input type="file" accept=".xlsx" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) loadMonitor(f); e.target.value = ''; }} />
           </label>
           <label className={'chip file' + (doc ? '' : ' warn')} title="Cargar reporte de ventas del POS">
-            <span>{doc ? `🧾 ${doc.meta.periodo || docName}` : '🧾 Cargar DOC del POS'}</span>
+            <span><AppIcon name="receipt" /> {doc ? (doc.meta.periodo || docName) : 'Cargar DOC del POS'}</span>
             <input id="file-doc-top" type="file" accept=".xlsx" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) loadDoc(f); e.target.value = ''; }} />
           </label>
           <button className="btn primary" onClick={() => setShowExport(true)}>Exportar Monitor{changes.total + pendingCounts ? <span className="dot">{changes.total + pendingCounts}</span> : null}</button>

@@ -1,7 +1,7 @@
 import React, { useContext, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppCtx } from './App.jsx';
-import { Badge, Empty, FilePick, NumInput, Segmented, Stat } from './ui.jsx';
+import { AppIcon, Badge, Empty, FilePick, NumInput, Segmented, Stat } from './ui.jsx';
 import { money, money0, num, isNum, longDate } from './lib/format.js';
 import { key, norm } from './lib/engine.js';
 import { IGNORE, lineKey, DEFAULT_IGNORED } from './lib/sales.js';
@@ -249,16 +249,16 @@ function Conteo() {
         <div className="chips">{cats.map((c) => <button key={c} className={'chip-btn' + (activeCats.has(c) ? ' on' : '')} onClick={() => toggleCat(c)} aria-pressed={activeCats.has(c)}>{c}</button>)}</div>
         <p className="muted small">{list.length} insumos en la hoja. Quita uno con el botón “Quitar” de la tabla de abajo.</p>
         <div className="chips">
-          <button className="btn primary" onClick={() => window.print()}>🖨 Imprimir hoja de conteo</button>
-          <button className="btn" onClick={downloadExcel}>⬇ Descargar formato Excel</button>
-          <button className="btn" onClick={downloadCsvTemplate}>⬇ Descargar formato CSV</button>
+          <button className="btn primary" onClick={() => window.print()}><AppIcon name="printer" /> Imprimir hoja de conteo</button>
+          <button className="btn" onClick={downloadExcel}><AppIcon name="download" /> Descargar formato Excel</button>
+          <button className="btn" onClick={downloadCsvTemplate}><AppIcon name="download" /> Descargar formato CSV</button>
           <FilePick id="file-conteo-fisico" label="Cargar conteo físico" hint="Sube el formato .xlsx o .csv con las cantidades capturadas." accept=".xlsx,.csv,text/csv" file={importName} onFile={loadPhysicalCount} error={importError || (importing ? 'Leyendo archivo…' : '')} />
         </div>
       </div>
       <div className="stats row">
         <Stat label="Contados" value={`${done} de ${inventory.length}`} />
         <Stat label="Diferencia valorizada" value={money(vDiff)} sub="contado − teórico (− = faltante)" tone={Math.abs(vDiff) < 1 ? undefined : vDiff < 0 ? 'bad' : 'warn'} />
-        <button className="btn" onClick={csv}>⬇ Descargar comparativo (CSV)</button>
+        <button className="btn" onClick={csv}><AppIcon name="download" /> Descargar comparativo (CSV)</button>
       </div>
       <div className="table-wrap">
         <table className="tbl compact">
@@ -312,7 +312,7 @@ function PrintSheet({ list, blind, who, doc }) {
           <tbody>
             {items.map((x) => (
               <tr key={x.ins.row}>
-                <td className="chk">☐</td><td><strong>{x.ins.name}</strong></td>
+                <td className="chk"><span className="print-check-box" /></td><td><strong>{x.ins.name}</strong></td>
                 <td>{x.ins.pres || x.ins.unit}{isNum(x.ins.gPres) ? ` (${num(x.ins.gPres, 0)} ${x.ins.unit === 'pza' ? 'g' : x.ins.unit})` : ''}</td>
                 {!blind && <td className="r">{isNum(x.teorico) ? `${num(x.natural(x.teorico), 0)} ${x.unitLabel}` : '—'}</td>}
                 <td className="box" /><td className="box" /><td className="obs" />

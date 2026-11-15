@@ -1,6 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { isNum } from './lib/format.js';
 
+const ICONS = {
+  file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h8" /></>,
+  receipt: <><path d="M4 3v18l3-2 3 2 3-2 3 2 4-2V3l-4 2-3-2-3 2-3-2z" /><path d="M8 9h8M8 13h8" /></>,
+  printer: <><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><path d="M6 14h12v7H6zM18 12h.01" /></>,
+  download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5M12 15V3" /></>,
+  trash: <><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6" /><path d="M10 11v5m4-5v5" /></>,
+  close: <><path d="m18 6-12 12M6 6l12 12" /></>,
+};
+
+export function AppIcon({ name, size = 18, className = '' }) {
+  return (
+    <svg className={`app-icon ${className}`} width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {ICONS[name]}
+    </svg>
+  );
+}
+
 export function NumInput({ value, onChange, className = '', placeholder, ...rest }) {
   const [txt, setTxt] = useState(isNum(value) ? String(value) : '');
   const focus = useRef(false);
@@ -65,7 +83,7 @@ export function Drawer({ open, onClose, title, children, wide }) {
   return (
     <div className="drawer-wrap" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <aside className={'drawer' + (wide ? ' wide' : '')} role="dialog" aria-label={title}>
-        <header><h2>{title}</h2><button className="icon-btn" onClick={onClose} aria-label="Cerrar">✕</button></header>
+        <header><h2>{title}</h2><button className="icon-btn" onClick={onClose} aria-label="Cerrar"><AppIcon name="close" /></button></header>
         <div className="drawer-body">{children}</div>
       </aside>
     </div>

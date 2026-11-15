@@ -1,7 +1,7 @@
 import React, { useContext, useMemo, useState } from 'react';
 import { AppCtx } from './App.jsx';
 import ProductDetail, { toneLabel } from './ProductDetail.jsx';
-import { Badge, Drawer, Empty, NumInput, Segmented, Stat } from './ui.jsx';
+import { AppIcon, Badge, Drawer, Empty, NumInput, Segmented, Stat } from './ui.jsx';
 import { CAT_TITLE } from './Menu.jsx';
 import { money, money4, num, pct, costTone, isNum } from './lib/format.js';
 import { key, myoSelection } from './lib/engine.js';
@@ -189,7 +189,7 @@ function RecetasTab() {
                   <td className="r muted">{l.tipo === 'Relleno' ? 'reparto' : num(std, 1)}</td>
                   <td className="r"><NumInput value={l.manual} onChange={(v) => actions.setReceta(l.row, { manual: v })} aria-label={`Cantidad manual de ${l.ingrediente}`} /></td>
                   <td className="r">{num(l.gramos, 1)}</td><td className="r">{isNum(l.costo) ? money(l.costo) : <Badge tone="warn">{l.estado}</Badge>}</td>
-                  <td><button className="icon-btn" onClick={() => actions.removeReceta(l.row)} aria-label={`Quitar ${l.ingrediente}`}>🗑</button></td>
+                  <td><button className="icon-btn" onClick={() => actions.removeReceta(l.row)} aria-label={`Quitar ${l.ingrediente}`}><AppIcon name="trash" /></button></td>
                 </tr>
               );
             })}
@@ -270,7 +270,7 @@ function VentasTab() {
     }
     return [...m.values()].sort((a, b) => b.neto - a.neto);
   }, [sales]);
-  if (!sales) return <Empty title="Falta el reporte del POS">Carga el DOC de “Ventas por producto” (botón 🧾 arriba) para ver la rentabilidad real del periodo.</Empty>;
+  if (!sales) return <Empty title="Falta el reporte del POS">Carga el DOC de “Ventas por producto” desde el botón de reporte de la barra superior para ver la rentabilidad real del periodo.</Empty>;
   const t = sales.totals; const util = t.sinIva - sales.costoTotal;
   return (
     <>
