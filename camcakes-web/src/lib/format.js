@@ -7,6 +7,10 @@ export const money4 = (n) => (isNum(n) ? '$' + n.toFixed(4) : '—');
 export const num = (n, d = 1) => (isNum(n) ? n.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: d }) : '—');
 export const pct = (n, d = 0) => (isNum(n) ? (n * 100).toFixed(d) + '%' : '—');
 export const today = () => new Date().toISOString().slice(0, 10);
+export const fileTimestamp = (date = new Date()) => {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
+};
 export const longDate = () => new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
 /** semáforo de costo sobre precio neto */
 export function costTone(p, goal = 0.35) { if (!isNum(p)) return 'none'; if (p <= goal) return 'good'; if (p <= goal + 0.1) return 'warn'; return 'bad'; }

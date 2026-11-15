@@ -2,7 +2,7 @@ import React, { useContext, useState } from 'react';
 import { AppCtx } from './App.jsx';
 import { buildMonitor } from './lib/export.js';
 import { key } from './lib/engine.js';
-import { today } from './lib/format.js';
+import { fileTimestamp } from './lib/format.js';
 import { AppIcon } from './ui.jsx';
 
 export default function ExportDialog({ onClose, changes }) {
@@ -17,7 +17,7 @@ export default function ExportDialog({ onClose, changes }) {
     try {
       const { bytes, closed } = await buildMonitor(bufferRef.current, original, model, { close, clearVentas, inventory, counts, keyOf: key });
       const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Monitor_Operacion_CamCakes_${today()}.xlsx`; a.click(); URL.revokeObjectURL(a.href);
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Monitor_Operacion_CamCakes_${fileTimestamp()}.xlsx`; a.click(); URL.revokeObjectURL(a.href);
       notify(close ? `Monitor generado. Nuevo stock inicial en ${closed} insumos.` : 'Monitor generado con tus ajustes.'); onClose();
     } catch (e) { setErr(e.message || String(e)); } finally { setBusy(false); }
   };
