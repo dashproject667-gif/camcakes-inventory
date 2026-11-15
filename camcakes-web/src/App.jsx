@@ -105,7 +105,7 @@ export default function App() {
     return (
       <div className="landing">
         <div className="landing-card">
-          <div className="brand big"><span className="logo">C</span><div><h1>Camcakes · Monitor</h1><p>Menú, costos e inventario en un solo lugar</p></div></div>
+          <div className="brand big"><img className="brand-logo" src="./camcakes-logo.png" alt="Logo Camcakes" /><div className="brand-text"><h1>Camcakes · Monitor</h1><p>Menú, costos e inventario en un solo lugar</p></div></div>
           <p className="lead">Carga tus archivos para empezar. Todo se procesa en tu navegador: <strong>nada se sube a un servidor ni se guarda de forma permanente</strong>. Tus cambios se conservan temporalmente en esta pestaña al recargar; al cerrar la pestaña se eliminan.</p>
           {persistenceError && <div className="fp-error" role="alert">{persistenceError}</div>}
           <div className="picks">
@@ -120,7 +120,7 @@ export default function App() {
   return (
     <AppCtx.Provider value={ctx}>
       <header className="topbar no-print">
-        <div className="brand"><span className="logo">C</span><div><strong>Camcakes</strong><span className="muted"> · Monitor</span></div></div>
+        <div className="brand"><img className="brand-logo" src="./camcakes-logo.png" alt="Logo Camcakes" /><div className="brand-text"><strong>Camcakes</strong><span className="muted"> · Monitor</span></div></div>
         <nav aria-label="Secciones">
           {SECTIONS.map((s) => <button key={s.id} className={section === s.id ? 'on' : ''} onClick={() => setSection(s.id)}>{s.label}</button>)}
         </nav>
