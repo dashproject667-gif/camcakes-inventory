@@ -1,4 +1,5 @@
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AppCtx } from './App.jsx';
 import ProductDetail, { toneLabel } from './ProductDetail.jsx';
 import { AppIcon, Badge, Drawer, Empty, NumInput, Segmented, Stat } from './ui.jsx';
@@ -6,14 +7,22 @@ import { CAT_TITLE } from './Menu.jsx';
 import { money, money4, num, pct, costTone, isNum } from './lib/format.js';
 import { key, myoSelection } from './lib/engine.js';
 
-const TABS = [['productos', 'Productos'], ['insumos', 'Insumos y precios'], ['recetas', 'Recetas'], ['myo', 'Make Your Own'], ['ventas', 'Ventas del periodo'], ['params', 'Parámetros']];
+const TABS = [['productos', 'Productos'], ['insumos', 'Insumos y precios'], ['recetas', 'Recetas'], ['myo', 'Make Your Own'], ['ventas', 'Ventas del periodo'], ['params', 'Parámetros'], ['sinliga', 'Sin receta']];
 
 export default function Costos() {
   const [tab, setTab] = useState('productos');
   const { sales } = useContext(AppCtx);
+  const [printTab, setPrintTab] = useState(null);
+  const printPdf = () => {
+    setPrintTab(tab);
+    setTimeout(() => window.print(), 100);
+  };
   return (
     <section>
-      <div className="section-head"><div><h1>Costos</h1><p className="muted">Cuánto cuesta producir cada producto y qué margen deja. Edita precios o recetas y se recalcula al instante.</p></div></div>
+      <div className="section-head">
+        <div><h1>Costos</h1><p className="muted">Cuánto cuesta producir cada producto y qué margen deja. Edita precios o recetas y se recalcula al instante.</p></div>
+        <button className="btn" onClick={printPdf}><AppIcon name="printer" /> Generar PDF</button>
+      </div>
       <Segmented value={tab} onChange={setTab} label="Costos" options={TABS.map(([v, l]) => ({ value: v, label: l }))} />
       <div className="tab-body">
         {tab === 'productos' && <ProductosTab />}
@@ -22,7 +31,9 @@ export default function Costos() {
         {tab === 'myo' && <MyoTab />}
         {tab === 'ventas' && <VentasTab />}
         {tab === 'params' && <ParamsTab />}
+        {tab === 'sinliga' && <SinRecetaTab onOpenRecetas={() => setTab('recetas')} />}
       </div>
+      {createPortal(<CostsPrintSheet tab={printTab} />, document.getElementById('print-root'))}
     </section>
   );
 }
@@ -88,11 +99,35 @@ function ProductosTab() {
   );
 }
 
+function EditableName({ value, onCommit, label, className = '', datalistId, placeholder }) {
+  const [draft, setDraft] = useState(value || '');
+  useEffect(() => setDraft(value || ''), [value]);
+  const commit = () => {
+    const clean = draft.trim();
+    if (!clean) { setDraft(value || ''); return; }
+    if (clean !== value && onCommit(clean) === false) setDraft(value || '');
+  };
+  return (
+    <input
+      className={className}
+      value={draft}
+      list={datalistId}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      aria-label={label}
+    />
+  );
+}
+
 function InsumosTab() {
-  const { costs, actions, notify } = useContext(AppCtx);
+  const { costs, model, actions, notify } = useContext(AppCtx);
   const [cat, setCat] = useState('all'); const [q, setQ] = useState(''); const [onlyEst, setOnlyEst] = useState(false); const [adv, setAdv] = useState(false);
   const [adding, setAdding] = useState(false); const [form, setForm] = useState({ cat: '', name: '', unit: 'g', pres: '', cont: null, precio: null });
-  const cats = [...new Set(costs.ins.map((i) => i.cat))];
+  const [catRename, setCatRename] = useState(''); const [catNewName, setCatNewName] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const cats = [...new Set([...(model.categorias || []), ...costs.ins.map((i) => i.cat)])].filter(Boolean);
   const rows = costs.ins.filter((i) => (cat === 'all' || i.cat === cat) && (!onlyEst || i.estado !== 'Real') && (!q || i.name.toLowerCase().includes(q.toLowerCase())));
   const est = costs.ins.filter((i) => i.estado !== 'Real').length;
   const submit = () => {
@@ -111,6 +146,51 @@ function InsumosTab() {
         <label className="check"><input type="checkbox" checked={adv} onChange={(e) => setAdv(e.target.checked)} /> Mostrar porciones de uso</label>
         <button className="btn" onClick={() => setAdding((a) => !a)}>{adding ? 'Cancelar' : '+ Agregar insumo'}</button>
       </div>
+      <div className="form-row category-manager">
+        <input
+          value={newCategory}
+          onChange={(e) => setNewCategory(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (actions.createCategoria(newCategory)) setNewCategory('');
+              else if (newCategory.trim()) notify('Esa categoría ya existe.');
+            }
+          }}
+          placeholder="Nombre de nueva categoría"
+          aria-label="Nueva categoría"
+        />
+        <button
+          className="btn"
+          onClick={() => {
+            if (actions.createCategoria(newCategory)) setNewCategory('');
+            else if (newCategory.trim()) notify('Esa categoría ya existe.');
+          }}
+          disabled={!newCategory.trim()}
+        >
+          + Crear categoría
+        </button>
+        <select value={catRename} onChange={(e) => setCatRename(e.target.value)} aria-label="Categoría a renombrar">
+          <option value="">Categoría a renombrar</option>
+          {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <EditableName
+          value={catNewName}
+          onCommit={(name) => {
+            if (!catRename) { notify('Primero selecciona la categoría que quieres renombrar.'); return false; }
+            const ok = actions.renameCategoria(catRename, name);
+            if (!ok) return false;
+            notify(`Categoría "${catRename}" renombrada como "${name}".`);
+            setCatRename(name);
+            setCatNewName('');
+            return true;
+          }}
+          label="Nuevo nombre de categoría"
+          placeholder="Nuevo nombre"
+        />
+        <span className="muted small">Las categorías también pueden escribirse directamente al editar A: Categoría o al agregar un insumo.</span>
+      </div>
+      <datalist id="inscategories">{cats.map((c) => <option key={c} value={c} />)}</datalist>
       {adding && (
         <div className="form-row">
           <input list="cats" placeholder="Categoría" value={form.cat} onChange={(e) => setForm({ ...form, cat: e.target.value })} aria-label="Categoría del insumo" />
@@ -125,13 +205,36 @@ function InsumosTab() {
       )}
       <div className="table-wrap">
         <table className="tbl compact">
-          <thead><tr><th>Insumo</th><th>Presentación</th><th className="r">Contenido</th><th>Unid.</th><th className="r">Precio $</th><th>Precio</th>{<th className="r">Peso/pza (g)</th>}<th className="r">Costo por g/ml/pza</th>{adv && <><th className="r">Uso mín</th><th className="r">Uso máx</th><th className="r">MYO mín</th><th className="r">MYO máx</th></>}<th className="r">Costo por porción</th></tr></thead>
+          <thead><tr><th>Insumo</th><th>Categoría</th><th>Presentación</th><th className="r">Contenido</th><th>Unid.</th><th className="r">Precio $</th><th>Precio</th>{<th className="r">Peso/pza (g)</th>}<th className="r">Costo por g/ml/pza</th>{adv && <><th className="r">Uso mín</th><th className="r">Uso máx</th><th className="r">MYO mín</th><th className="r">MYO máx</th></>}<th className="r">Costo por porción</th></tr></thead>
           <tbody>
             {rows.map((i) => {
               const d = costs.insOf(i.name);
               return (
                 <tr key={i.row}>
-                  <td><strong>{i.name}</strong><div className="muted small">{i.cat}</div></td>
+                  <td>
+                    <EditableName
+                      value={i.name}
+                      onCommit={(name) => {
+                        const ok = actions.renameInsumo(i.row, name);
+                        if (!ok) notify('Ese nombre ya existe en los insumos.');
+                        return ok;
+                      }}
+                      label={`Nombre del insumo ${i.name}`}
+                      className="name-edit"
+                    />
+                  </td>
+                  <td>
+                    <EditableName
+                      value={i.cat}
+                      onCommit={(name) => {
+                        actions.setInsumo(i.row, { cat: name });
+                        return true;
+                      }}
+                      label={`Categoría de ${i.name}`}
+                      className="category-edit"
+                      datalistId="inscategories"
+                    />
+                  </td>
                   <td className="muted">{i.pres}</td>
                   <td className="r"><NumInput value={i.cont} onChange={(v) => actions.setInsumo(i.row, { cont: v })} aria-label={`Contenido de ${i.name}`} /></td>
                   <td className="muted">{i.unit}</td>
@@ -300,13 +403,174 @@ function VentasTab() {
 function ParamsTab() {
   const { model, actions } = useContext(AppCtx);
   const p = model.params;
+  const costsContext = useContext(AppCtx);
+  const kit = p.crepeKit || [];
   const F = ({ label, hint, children }) => <div className="param"><label><span>{label}</span>{children}</label><small className="muted">{hint}</small></div>;
+  const setKitItem = (index, patch) => {
+    const next = kit.map((item, i) => (i === index ? { ...item, ...patch } : item));
+    actions.setParam('crepeKit', next);
+  };
+  const removeKitItem = (index) => actions.setParam('crepeKit', kit.filter((_, i) => i !== index));
+  const addKitItem = () => {
+    const first = costsContext.costs?.ins?.find((item) => /empaque/i.test(item.cat));
+    if (!first) return;
+    if (kit.length >= 12) return;
+    actions.setParam('crepeKit', [...kit, { name: first.name, qty: 1 }]);
+  };
   return (
     <div className="params">
       <F label="Relleno total por crepa (g)" hint="Con 2 rellenos se reparte en partes iguales."><NumInput value={p.relleno} onChange={(v) => actions.setParam('relleno', v ?? 0)} /></F>
       <F label="Tope de toppings en Make Your Own (g)" hint="Si el cliente elige más, se reducen proporcionalmente."><NumInput value={p.tope} onChange={(v) => actions.setParam('tope', v ?? 0)} /></F>
       <F label="IVA incluido en el precio de menú (%)" hint="Para calcular precio neto. Usa 0 si prefieres ver todo con IVA."><NumInput value={Math.round(p.iva * 10000) / 100} onChange={(v) => actions.setParam('iva', (v ?? 0) / 100)} /></F>
-      <F label="Empaque por crepa ($)" hint="Caja, tenedor, servilleta… se suma al costo de cada crepa."><NumInput value={p.empaque} onChange={(v) => actions.setParam('empaque', v ?? 0)} /></F>
+      <F label="Empaque por crepa ($)" hint={kit.length ? 'Calculado automáticamente con los insumos del kit de empaque.' : 'Sin kit configurado; puede capturarse manualmente.'}>
+        {kit.length ? <strong>{money(p.crepeKitCost)}</strong> : <NumInput value={p.empaque} onChange={(v) => actions.setParam('empaque', v ?? 0)} />}
+      </F>
+      <div className="param kit-param">
+        <div className="kit-param-head">
+          <div>
+            <strong>Kit de empaque por crepa</strong>
+            <small className="muted">Se descuenta automáticamente por cada crepa vendida.</small>
+          </div>
+          <strong>{money(p.crepeKitCost)}</strong>
+        </div>
+        {kit.map((item, index) => (
+          <div className="kit-row" key={`${item.name}-${index}`}>
+            <select value={item.name} onChange={(e) => setKitItem(index, { name: e.target.value })} aria-label={`Insumo del kit ${index + 1}`}>
+              {costsContext.costs.ins.map((ins) => <option key={ins.row} value={ins.name}>{ins.name}</option>)}
+            </select>
+            <NumInput value={item.qty} onChange={(qty) => setKitItem(index, { qty: qty ?? 0 })} placeholder="Piezas" aria-label={`Piezas de ${item.name}`} />
+            <button type="button" className="icon-btn" onClick={() => removeKitItem(index)} aria-label={`Quitar ${item.name}`}><AppIcon name="trash" /></button>
+          </div>
+        ))}
+        <button type="button" className="btn" onClick={addKitItem} disabled={kit.length >= 12}>+ Agregar pieza al kit</button>
+      </div>
+    </div>
+  );
+}
+
+function SinRecetaTab({ onOpenRecetas }) {
+  const { costs, model } = useContext(AppCtx);
+  const linked = new Set();
+  for (const recipe of model.recetas || []) linked.add(key(recipe.ingrediente));
+  for (const insumo of costs.ins) {
+    if (insumo.cat === 'Relleno' || (isNum(insumo.myo) && /^Topping/i.test(insumo.cat))) linked.add(key(insumo.name));
+  }
+  for (const item of model.params.crepeKit || []) linked.add(key(item.name));
+  for (const name of [model.params.masa, model.params.nieve, model.params.crema, model.params.leche]) {
+    if (name) linked.add(key(name));
+  }
+  for (const name of Object.values(model.params.lechas || {})) if (name) linked.add(key(name));
+
+  const unlinked = costs.ins.filter((insumo) => !linked.has(key(insumo.name))).sort((a, b) => a.cat.localeCompare(b.cat) || a.name.localeCompare(b.name));
+  return (
+    <>
+      <div className="note warn">
+        <strong>{unlinked.length} insumo(s) sin usar en recetas</strong>. Revisa si deben agregarse a una receta o si son insumos de venta directa.
+      </div>
+      {unlinked.length === 0 ? <Empty title="Todo está ligado">Todos los insumos aparecen en al menos una receta o configuración especial.</Empty> : (
+        <div className="table-wrap">
+          <table className="tbl compact">
+            <thead><tr><th>Categoría</th><th>Insumo</th><th>Presentación</th><th className="r">Contenido</th><th className="r">Stock inicial</th><th>Acción</th></tr></thead>
+            <tbody>
+              {unlinked.map((insumo) => (
+                <tr key={insumo.row}>
+                  <td className="muted">{insumo.cat || 'Sin categoría'}</td>
+                  <td><strong>{insumo.name}</strong></td>
+                  <td className="muted">{insumo.pres || '—'}</td>
+                  <td className="r">{isNum(insumo.cont) ? `${num(insumo.cont, 1)} ${insumo.unit}` : '—'}</td>
+                  <td className="r">{isNum(insumo.stockIni) ? num(insumo.stockIni, 3) : 'Sin capturar'}</td>
+                  <td><button className="link" onClick={onOpenRecetas}>Agregar a receta</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
+function CostsPrintSheet({ tab }) {
+  const { costs, model } = useContext(AppCtx);
+  if (!tab) return null;
+  const date = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+  return (
+    <div className="print-sheet costs-print-sheet">
+      <header>
+        <h1>Camcakes · {tab === 'recetas' ? 'Recetas' : tab === 'sinliga' ? 'Insumos sin receta' : 'Costos'}</h1>
+        <p>Generado el {date}</p>
+      </header>
+      {tab === 'productos' && (
+        <table>
+          <thead><tr><th>Producto</th><th>Categoría</th><th className="r">Precio</th><th className="r">Neto</th><th className="r">Costo</th><th className="r">Utilidad</th><th className="r">Costo %</th></tr></thead>
+          <tbody>{costs.prods.filter((p) => p.tipo !== 'MYO').map((p) => (
+            <tr key={p.row}><td>{p.nombre}</td><td>{CAT_TITLE[p.cat] || p.cat}</td><td className="r">{money(p.precio)}</td><td className="r">{money(p.neto)}</td><td className="r">{money(p.total)}</td><td className="r">{money(p.utilidad)}</td><td className="r">{pct(p.pct)}</td></tr>
+          ))}</tbody>
+        </table>
+      )}
+      {tab === 'recetas' && (
+        <>{[...new Map(costs.rec.map((line) => [line.producto, []])).keys()].map((productName) => {
+          const lines = costs.rec.filter((line) => line.producto === productName);
+          if (!lines.length) return null;
+          const product = costs.prodByKey.get(key(productName));
+          return (
+            <table key={productName}>
+              <caption>{productName}</caption>
+              <thead><tr><th>Ingrediente</th><th>Tipo</th><th className="r">Cantidad</th><th className="r">Costo</th></tr></thead>
+              <tbody>{lines.map((line) => (
+                <tr key={line.row}><td>{line.ingrediente}</td><td>{line.tipo}</td><td className="r">{isNum(line.gramos) ? `${num(line.gramos, 2)} g` : '—'}</td><td className="r">{money(line.costo)}</td></tr>
+              ))}
+              <tr><td colSpan={3}><strong>Costo total</strong></td><td className="r"><strong>{money(product?.total)}</strong></td></tr></tbody>
+            </table>
+          );
+        })}</>
+      )}
+      {tab === 'insumos' && (
+        <table>
+          <thead><tr><th>Categoría</th><th>Insumo</th><th>Presentación</th><th className="r">Contenido</th><th className="r">Precio</th><th>Estado</th><th className="r">Costo / unidad</th></tr></thead>
+          <tbody>{costs.ins.map((insumo) => (
+            <tr key={insumo.row}><td>{insumo.cat}</td><td>{insumo.name}</td><td>{insumo.pres}</td><td className="r">{isNum(insumo.cont) ? `${num(insumo.cont, 1)} ${insumo.unit}` : '—'}</td><td className="r">{money(insumo.precio)}</td><td>{insumo.estado}</td><td className="r">{money4(insumo.costoG)}</td></tr>
+          ))}</tbody>
+        </table>
+      )}
+      {tab === 'sinliga' && (
+        <table>
+          <thead><tr><th>Categoría</th><th>Insumo</th><th>Presentación</th><th className="r">Contenido</th><th className="r">Stock inicial</th></tr></thead>
+          <tbody>{(() => {
+            const linked = new Set();
+            for (const recipe of model.recetas || []) linked.add(key(recipe.ingrediente));
+            for (const insumo of costs.ins) {
+              if (insumo.cat === 'Relleno' || (isNum(insumo.myo) && /^Topping/i.test(insumo.cat))) linked.add(key(insumo.name));
+            }
+            for (const item of model.params.crepeKit || []) linked.add(key(item.name));
+            for (const name of [model.params.masa, model.params.nieve, model.params.crema, model.params.leche]) if (name) linked.add(key(name));
+            for (const name of Object.values(model.params.lechas || {})) if (name) linked.add(key(name));
+            return costs.ins.filter((insumo) => !linked.has(key(insumo.name))).map((insumo) => (
+              <tr key={insumo.row}><td>{insumo.cat || 'Sin categoría'}</td><td>{insumo.name}</td><td>{insumo.pres}</td><td className="r">{isNum(insumo.cont) ? `${num(insumo.cont, 1)} ${insumo.unit}` : '—'}</td><td className="r">{isNum(insumo.stockIni) ? num(insumo.stockIni, 3) : '—'}</td></tr>
+            ));
+          })()}</tbody>
+        </table>
+      )}
+      {['myo', 'ventas', 'params'].includes(tab) && (
+        <table>
+          <thead><tr><th>Información</th><th>Detalle</th></tr></thead>
+          <tbody>
+            {tab === 'myo' && <>
+              <tr><td>Mejor caso MYO</td><td>{money(costs.myo.mejor)}</td></tr>
+              <tr><td>Peor caso MYO</td><td>{money(costs.myo.peor)}</td></tr>
+              <tr><td>Relleno total</td><td>{num(model.params.relleno, 1)} g</td></tr>
+              <tr><td>Tope de toppings</td><td>{num(model.params.tope, 1)} g</td></tr>
+            </>}
+            {tab === 'params' && <>
+              <tr><td>Relleno por crepa</td><td>{num(model.params.relleno, 1)} g</td></tr>
+              <tr><td>Tope MYO</td><td>{num(model.params.tope, 1)} g</td></tr>
+              <tr><td>IVA</td><td>{pct(model.params.iva)}</td></tr>
+              <tr><td>Empaque por crepa</td><td>{money(model.params.empaque)}</td></tr>
+            </>}
+            {tab === 'ventas' && <tr><td>Reporte del periodo</td><td>Usa la pestaña Ventas del periodo en la pantalla web para ver el detalle completo.</td></tr>}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

@@ -19,6 +19,19 @@ El sistema trabaja con los archivos en el navegador. No los sube a un servidor n
 
 Si reemplazas el Monitor por otro archivo, el sistema vuelve a tomar ese archivo como base y reinicia las capturas físicas del inventario de la sesión. Antes de reemplazarlo, descarga cualquier cambio que quieras conservar.
 
+## Monitores y trazabilidad
+
+Esta sección genera una estructura ZIP para organizar los Excel por periodo.
+
+- Selecciona el primer mes y el último mes.
+- El sistema crea una carpeta por cada mes con formato **AAAA-MM**, por ejemplo **2026-02**.
+- Las carpetas se generan vacías; no incluyen copias del Monitor ni datos del negocio.
+- Se recomienda descargar la estructura una sola vez y guardarla en la ubicación principal donde se conservarán los archivos.
+- Dentro de cada periodo, guarda el Monitor correspondiente, el reporte del POS y el conteo físico.
+- Antes de trabajar, carga el Monitor actual desde la carpeta correspondiente a ese periodo.
+
+Los periodos mejoran la trazabilidad y reducen el riesgo de mezclar datos de meses diferentes. No reemplazan el respaldo del Monitor exportado ni deben usarse para borrar información.
+
 ## Menú
 
 Esta sección sirve para consultar los productos que se venden.
@@ -52,6 +65,10 @@ Aquí se mantienen los ingredientes y materiales usados por las recetas.
 - **MYO mín. y máx.**: cantidades usadas para calcular los ingredientes de Make Your Own.
 
 Al activar **Mostrar porciones de uso** aparecen campos adicionales para las cantidades de uso. Para agregar un insumo, selecciona **Agregar insumo**, completa categoría y nombre, y agrega los datos de presentación que conozcas. El nombre debe ser único.
+
+También puedes cambiar directamente el nombre o la categoría de un insumo en su fila. Al renombrar un insumo, la aplicación actualiza automáticamente las recetas, los nombres relacionados de parámetros y las referencias del catálogo Zettle que usan ese insumo.
+
+Para crear una categoría sin asignarla todavía a un insumo, escribe su nombre en **Nueva categoría** y selecciona **Crear categoría**. La categoría quedará disponible en los filtros y en el Excel exportado. Para renombrar una categoría completa, selecciónala y escribe el nuevo nombre en el administrador de categorías.
 
 Si falta un precio o una cantidad necesaria, algunos costos pueden aparecer como incompletos. Revisa primero el insumo señalado y su receta.
 
@@ -87,6 +104,7 @@ Permite revisar o cambiar datos generales usados por los cálculos:
 - límite de gramos para toppings de Make Your Own;
 - porcentaje de IVA incluido en el precio de menú;
 - costo del empaque por crepa.
+- piezas incluidas en el kit de empaque por crepa.
 
 Modifica estos valores solo si sabes que la regla de operación cambió.
 
@@ -100,7 +118,11 @@ El teórico estima cuánto debería quedar de cada insumo después de las ventas
 
 **Stock inicial + compras − consumo estimado por ventas = stock teórico**
 
-- **Stock inicial** y **Compras** se capturan en número de presentaciones. Por ejemplo, si el insumo se compra en bolsas, escribe cuántas bolsas había al inicio y cuántas se compraron.
+- **Stock inicial** se captura con dos campos: **Cerradas** cuenta presentaciones completas y **Abierta** escribe lo que queda en g, ml o piezas. Por ejemplo, aceite con una presentación cerrada y 113 g abiertos se captura como Cerradas 1 y Abierta 113. Para insumos como la masa, puede capturarse directamente en su medida original.
+- Las **Cerradas** solo aceptan números enteros de presentaciones o paquetes completos. La unidad visible indica si el insumo se cuenta en g, ml o piezas, y evita mezclar unidades.
+- Debajo de las cantidades cerradas y abiertas aparece la operación visual, por ejemplo `5 × 235 g = 1175 g`, `+ 113 g abierta` y `Total: 1288 g`. Para insumos por piezas se muestra el mismo cálculo con piezas y paquetes.
+- En el campo **Abierta** también puedes escribir sumas como `340+113`; el sistema convierte el total a presentaciones completas y cantidad abierta.
+- **Compras** se mantiene en número de presentaciones cerradas, porque normalmente se reciben botes o paquetes completos.
 - **Consumo por ventas** se calcula con las recetas y las ventas reconocidas.
 - **Teórico** muestra la cantidad estimada restante en la unidad del insumo.
 - **Mínimo** es el nivel mínimo que deseas mantener; se captura en gramos, mililitros o piezas según el insumo.
@@ -177,6 +199,27 @@ Las ventas del reporte del punto de venta sirven para calcular el inventario te�
 | **Abierta** | Cantidad restante en una presentación ya abierta. |
 | **MYO / Make Your Own** | Producto que permite elegir rellenos y toppings. |
 | **Costo estimado** | Cálculo aproximado cuando falta un precio o dato confirmado. |
+
+## Insumos sin receta
+
+La pestaña **Sin receta** muestra insumos registrados que no aparecen en una receta, una opción Make Your Own con porción definida, el kit de empaque ni los parámetros generales. Sirve para revisar si hacen falta:
+
+- agregar el insumo a un producto;
+- confirmarlo como insumo de venta directa;
+- añadirlo al kit de empaque o a otra configuración especial.
+
+La tabla incluye categoría, presentación, contenido y stock inicial. Al seleccionar **Agregar a receta**, puedes continuar en la pestaña **Recetas**.
+
+## Generar PDF
+
+En la sección **Costos**, el botón **Generar PDF** abre el cuadro de impresión del navegador. Selecciona **Guardar como PDF** para obtener un archivo. El contenido impreso corresponde a la pestaña actualmente abierta:
+
+- **Productos:** resumen de precios y márgenes.
+- **Recetas:** receta, cantidades y costo por producto.
+- **Insumos y precios:** catálogo, presentaciones y costos.
+- **Sin receta:** insumos que no aparecen en una receta.
+
+Los valores se toman del cálculo actual y no modifican el Monitor ni los datos temporales.
 
 ## Rutina recomendada para cada periodo
 

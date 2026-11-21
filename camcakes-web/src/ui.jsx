@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { isNum } from './lib/format.js';
+import { parseQuantityExpression } from './lib/quantity.js';
 
 const ICONS = {
   file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h8" /></>,
@@ -8,6 +9,7 @@ const ICONS = {
   download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5M12 15V3" /></>,
   trash: <><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6" /><path d="M10 11v5m4-5v5" /></>,
   close: <><path d="m18 6-12 12M6 6l12 12" /></>,
+  folder: <><path d="M3 6h7l2 2h9v11H3z" /></>,
 };
 
 export function AppIcon({ name, size = 18, className = '' }) {
@@ -42,6 +44,32 @@ export function NumInput({ value, onChange, className = '', placeholder, ...rest
         if (Number.isFinite(n) && n !== value) onChange(n);
       }}
       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} {...rest} />
+  );
+}
+
+export function QuantityInput({ value, onChange, className = '', placeholder, integerOnly = false, ...rest }) {
+  const [txt, setTxt] = useState(isNum(value) ? String(value) : '');
+  useEffect(() => { setTxt(isNum(value) ? String(value) : ''); }, [value]);
+  const commit = () => {
+    const parsed = parseQuantityExpression(txt);
+    if (parsed === null) { setTxt(isNum(value) ? String(value) : ''); return; }
+    if (parsed < 0 || (integerOnly && !Number.isInteger(parsed))) {
+      setTxt(isNum(value) ? String(value) : '');
+      return;
+    }
+    if (parsed !== value) onChange(parsed);
+  };
+  return (
+    <input
+      className={'num ' + className}
+      inputMode="decimal"
+      value={txt}
+      placeholder={placeholder}
+      onChange={(e) => setTxt(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      {...rest}
+    />
   );
 }
 

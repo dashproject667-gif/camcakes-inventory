@@ -144,6 +144,19 @@ export async function patchXlsx(buffer, ops, opts = {}) {
   calc.setAttribute('fullCalcOnLoad', '1');
   calc.setAttribute('forceFullCalc', '1');
   zip.file('xl/workbook.xml', ser.serializeToString(wbDoc));
+  if (zip.file('xl/calcChain.xml')) {
+    zip.remove('xl/calcChain.xml');
+    const ctFile = zip.file('[Content_Types].xml');
+    if (ctFile) {
+      const ct = await ctFile.async('string');
+      zip.file('[Content_Types].xml', ct.replace(/<Override[^>]*calcChain[^>]*\/>/, ''));
+    }
+    const relsFile = zip.file('xl/_rels/workbook.xml.rels');
+    if (relsFile) {
+      const rels = await relsFile.async('string');
+      zip.file('xl/_rels/workbook.xml.rels', rels.replace(/<Relationship[^>]*calcChain[^>]*\/>/, ''));
+    }
+  }
   const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
   return { bytes, log };
 }

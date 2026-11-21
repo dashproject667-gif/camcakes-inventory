@@ -21,6 +21,14 @@ export function computeCosts(model) {
     return d;
   });
   const insOf = (name) => insByKey.get(key(name)) || null;
+  const crepeKit = (params.crepeKit || []).map((item) => ({ ...item, ins: insOf(item.name) }));
+  const crepeKitCost = crepeKit.reduce((sum, item) => {
+    const costoG = item.ins?.costoG;
+    return isNum(costoG) && isNum(item.qty) ? sum + item.qty * costoG : sum;
+  }, 0);
+  const effectiveParams = { ...params, empaque: crepeKit.length ? crepeKitCost : (isNum(params.empaque) ? params.empaque : 0) };
+  params.empaque = effectiveParams.empaque;
+  params.crepeKitCost = crepeKitCost;
 
   // Recetas
   const relCount = new Map();

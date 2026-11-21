@@ -1,13 +1,14 @@
 import React, { useContext, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppCtx } from './App.jsx';
-import { AppIcon, Badge, Empty, FilePick, NumInput, Segmented, Stat } from './ui.jsx';
+import { AppIcon, Badge, Empty, FilePick, NumInput, QuantityInput, Segmented, Stat } from './ui.jsx';
 import { money, money0, num, isNum, longDate } from './lib/format.js';
 import { key, norm } from './lib/engine.js';
 import { IGNORE, lineKey, DEFAULT_IGNORED } from './lib/sales.js';
 import { stockAlert } from './lib/engine.js';
 import { readXlsx } from './lib/xlsx.js';
 import { buildPhysicalInventoryCsv, buildPhysicalInventoryTemplate, parsePhysicalInventory, parsePhysicalInventoryCsv } from './lib/physicalInventory.js';
+import { normalizeInitialStock, parseQuantityExpression } from './lib/quantity.js';
 
 const ALERT_TONE = { OK: 'good', BAJO: 'warn', AGOTADO: 'bad', 'Sin stock capturado': 'none' };
 const groupBy = (rows, f) => { const m = new Map(); for (const r of rows) { const k = f(r); if (!m.has(k)) m.set(k, []); m.get(k).push(r); } return [...m.entries()]; };
@@ -36,6 +37,43 @@ export default function Inventario() {
 function Teorico() {
   const { inventory, actions, costs } = useContext(AppCtx);
   const [q, setQ] = useState(''); const [flt, setFlt] = useState('all'); const [open, setOpen] = useState(null);
+  const setStockInitial = (i, patch) => {
+    const closed = patch.closed !== undefined ? patch.closed : i.stockClosed;
+    const openValue = patch.open !== undefined ? patch.open : i.stockOpen;
+    const presentationSize = i.unit === 'pza' ? i.cont : i.gPres;
+    const normalized = normalizeInitialStock(closed, openValue, presentationSize);
+    actions.setInsumo(i.row, {
+      stockIni: normalized.presentaciones,
+      stockClosed: normalized.cerradas,
+      stockOpen: normalized.abierta,
+    });
+  };
+  const stockUnit = (i) => i.unit === 'pza' ? 'piezas' : i.unit;
+  const presentationUnit = (i) => i.unit === 'pza' ? 'presentaciones cerradas / paquetes' : 'presentaciones cerradas';
+  const stockCalculation = (i) => {
+    const closed = isNum(i.stockClosed) ? i.stockClosed : 0;
+    const openValue = isNum(i.stockOpen) ? i.stockOpen : 0;
+    const content = isNum(i.cont) && i.cont > 0 ? i.cont : null;
+    if (i.unit === 'pza') {
+      if (!content) return { closedText: 'Falta contenido por presentación', openText: '', totalText: '' };
+      const closedTotal = closed * content;
+      const total = closedTotal + openValue;
+      return {
+        closedText: `${num(closed, 0)} × ${num(content, 0)} piezas = ${num(closedTotal, 0)} piezas`,
+        openText: openValue ? `+ ${num(openValue, 0)} piezas abierta` : '+ 0 piezas abierta',
+        totalText: `Total: ${num(total, 0)} piezas`,
+      };
+    }
+    if (!content) return { closedText: 'Falta contenido por presentación', openText: '', totalText: '' };
+    const unit = stockUnit(i);
+    const closedTotal = closed * content;
+    const total = closedTotal + openValue;
+    return {
+      closedText: `${num(closed, 0)} × ${num(content, 1)} ${unit} = ${num(closedTotal, 1)} ${unit}`,
+      openText: openValue ? `+ ${num(openValue, 1)} ${unit} abierta` : `+ 0 ${unit} abierta`,
+      totalText: `Total: ${num(total, 1)} ${unit}`,
+    };
+  };
   const alertOf = (x) => stockAlert(x.teorico, x.ins.stockMin, x.hasStock);
   const rows = inventory.filter((x) => (!q || x.ins.name.toLowerCase().includes(q.toLowerCase())) && (flt === 'all' || (flt === 'mov' ? x.consumo !== 0 : alertOf(x) === flt)));
   const cnt = (a) => inventory.filter((x) => alertOf(x) === a).length;
@@ -54,18 +92,28 @@ function Teorico() {
       </div>
       <div className="table-wrap">
         <table className="tbl compact">
-          <thead><tr><th>Insumo</th><th className="r">Stock inicial<br /><small>(presentaciones)</small></th><th className="r">Compras<br /><small>(presentaciones)</small></th><th className="r">Consumo por ventas</th><th className="r">Teórico</th><th className="r">Mínimo</th><th>Alerta</th></tr></thead>
+          <thead><tr><th>Insumo</th><th>Cerradas<br /><small>(presentaciones completas)</small></th><th className="r">Abierta<br /><small>medida original</small></th><th className="r">Compras<br /><small>(presentaciones)</small></th><th className="r">Consumo por ventas</th><th className="r">Teórico</th><th className="r">Mínimo</th><th>Alerta</th></tr></thead>
           <tbody>
             {groupBy(rows, (x) => x.ins.cat).map(([cat, items]) => (
               <React.Fragment key={cat}>
-                <tr className="group"><td colSpan={7}>{cat}</td></tr>
+                <tr className="group"><td colSpan={8}>{cat}</td></tr>
                 {items.map((x) => {
                   const a = alertOf(x); const i = x.ins;
+                  const stockCalc = stockCalculation(i);
                   return (
                     <React.Fragment key={i.row}>
                       <tr>
                         <td><strong>{i.name}</strong><div className="muted small">{i.pres || ''}{isNum(i.gPres) ? ` · ${num(i.gPres, 0)} ${i.unit === 'pza' ? 'g' : i.unit}/pres.` : ''}</div></td>
-                        <td className="r"><NumInput value={i.stockIni} onChange={(v) => actions.setInsumo(i.row, { stockIni: v })} aria-label={`Stock inicial de ${i.name}`} /></td>
+                        <td className="r">
+                          <QuantityInput value={i.stockClosed} onChange={(v) => setStockInitial(i, { closed: v })} integerOnly aria-label={`${presentationUnit(i)} de ${i.name}`} />
+                          <div className="muted small">{i.unit === 'pza' ? 'paquetes' : i.unit}</div>
+                          <div className="stock-equation">{stockCalc.closedText}</div>
+                        </td>
+                        <td className="r">
+                          <QuantityInput value={i.stockOpen} onChange={(v) => setStockInitial(i, { open: v })} aria-label={`Cantidad abierta de ${i.name}`} />
+                          {stockCalc.openText && <div className="stock-equation">{stockCalc.openText}</div>}
+                          {stockCalc.totalText && <div className="stock-total">{stockCalc.totalText}</div>}
+                        </td>
                         <td className="r"><NumInput value={i.compras} onChange={(v) => actions.setInsumo(i.row, { compras: v })} aria-label={`Compras de ${i.name}`} /></td>
                         <td className="r">{x.consumo ? <button className="link" onClick={() => setOpen(open === i.row ? null : i.row)} aria-expanded={open === i.row}>{num(x.natural(x.consumo), 0)} {x.unitLabel}</button> : <span className="muted">0</span>}</td>
                         <td className="r"><strong className={isNum(x.teorico) && x.teorico <= 0 ? 'neg' : ''}>{isNum(x.teorico) ? `${num(x.natural(x.teorico), 0)} ${x.unitLabel}` : '—'}</strong>{isNum(x.presTeorica) ? <div className="muted small">≈ {num(x.presTeorica, 1)} pres.</div> : null}</td>
@@ -73,7 +121,7 @@ function Teorico() {
                         <td><Badge tone={ALERT_TONE[a]}>{a}</Badge></td>
                       </tr>
                       {open === i.row && (
-                        <tr className="sub"><td colSpan={7}>
+                        <tr className="sub"><td colSpan={8}>
                           <strong>De dónde sale el consumo:</strong>{' '}
                           {[...x.by.entries()].sort((p, q2) => Math.abs(q2[1]) - Math.abs(p[1])).map(([k, g]) => `${k}: ${num(x.natural(g), 0)} ${x.unitLabel}`).join(' · ')}
                         </td></tr>

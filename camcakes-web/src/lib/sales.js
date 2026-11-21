@@ -36,7 +36,7 @@ export function resolveLine(line, model, costs, state, catalog) {
   if (z) {
     if (z.tipo === 'Relleno MYO (125 g)') return { status: 'ok', via: 'catálogo', kind: 'relleno', insumo: z.ref, zrow: z.row, tipo: z.tipo };
     if (z.tipo === 'Topping MYO (porción)') return { status: 'ok', via: 'catálogo', kind: 'topping', insumo: z.ref, zrow: z.row, tipo: z.tipo };
-    if (z.tipo === 'Masa + nieve + crema') return { status: 'ignored', why: 'Crepa genérica (base MYO anterior)' };
+    if (z.tipo === 'Masa + nieve + crema') return { status: 'ok', via: 'catálogo', kind: 'crepa-base', tipo: z.tipo };
     return { status: 'ok', via: 'catálogo', kind: 'prod', producto: z.ref, tipo: z.tipo, omit: z.omitido, leche: z.leche, zrow: z.row };
   }
   // 2) palabras clave (misma regla que la hoja Ventas del Monitor)
@@ -82,13 +82,13 @@ export function computeSales(model, costs, docLines, state) {
       const ins = costs.insOf(res.insumo);
       add(res.insumo, params.relleno * q, 'Crepa Make Your Own');
       let cu = ins && isNum(ins.costoG) ? params.relleno * ins.costoG : null;
-      if (state.myoBase) {
-        add(params.masa, masaUso * q, 'Crepa Make Your Own');
-        if (myoNieve) add(params.nieve, nieveUso * q, 'Crepa Make Your Own');
-        if (myoCrema) add(params.crema, cremaUso * q, 'Crepa Make Your Own');
-        if (cu !== null) cu += costs.base.masa + (myoNieve ? costs.base.nieve : 0) + (myoCrema ? costs.base.crema : 0) + params.empaque;
-      }
       row.costoUnit = cu;
+    } else if (res.kind === 'crepa-base') {
+      add(params.masa, masaUso * q, 'Crepa Make Your Own');
+      if (myoNieve) add(params.nieve, nieveUso * q, 'Crepa Make Your Own');
+      if (myoCrema) add(params.crema, cremaUso * q, 'Crepa Make Your Own');
+      for (const item of params.crepeKit || []) add(item.name, item.qty * q, 'Crepa Make Your Own');
+      row.costoUnit = costs.base.masa + (myoNieve ? costs.base.nieve : 0) + (myoCrema ? costs.base.crema : 0) + params.empaque;
     } else if (res.kind === 'topping') {
       const ins = costs.insOf(res.insumo);
       add(res.insumo, (ins?.myo ?? 0) * q, 'Topping MYO');
@@ -100,6 +100,9 @@ export function computeSales(model, costs, docLines, state) {
       for (const l of p.lines) {
         if (omit && key(l.ingrediente) === omit) continue;
         if (isNum(l.gramos)) add(l.ingrediente, l.gramos * q, p.nombre);
+      }
+      if (p.tipo !== 'Bebida') {
+        for (const item of params.crepeKit || []) add(item.name, item.qty * q, p.nombre);
       }
       if (p.nieve === 'SI') add(params.nieve, nieveUso * q, p.nombre);
       if (p.crema === 'SI') add(params.crema, cremaUso * q, p.nombre);

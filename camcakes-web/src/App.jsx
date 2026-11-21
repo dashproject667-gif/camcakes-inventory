@@ -10,9 +10,10 @@ import Menu from './Menu.jsx';
 import Costos from './Costos.jsx';
 import Inventario from './Inventario.jsx';
 import ExportDialog from './ExportDialog.jsx';
+import Monitores from './Monitores.jsx';
 
 export const AppCtx = React.createContext(null);
-const SECTIONS = [{ id: 'menu', label: 'Menú' }, { id: 'costos', label: 'Costos' }, { id: 'inventario', label: 'Inventario' }];
+const SECTIONS = [{ id: 'menu', label: 'Menú' }, { id: 'costos', label: 'Costos' }, { id: 'inventario', label: 'Inventario' }, { id: 'monitores', label: 'Monitores y trazabilidad' }];
 
 export default function App() {
   const [restored] = useState(loadSession);
@@ -57,6 +58,59 @@ export default function App() {
     return {
       setParam: (f, v) => upd((c) => { c.params = { ...c.params, [f]: v }; }),
       setInsumo: (row, patch) => upd((c) => { c.insumos = c.insumos.map((i) => (i.row === row ? { ...i, ...patch } : i)); }),
+      renameInsumo: (row, newName) => {
+        const cleanName = String(newName || '').trim();
+        if (!cleanName) return false;
+        const current = model?.insumos.find((i) => i.row === row);
+        if (!current || key(current.name) === key(cleanName)) return true;
+        if (model.insumos.some((i) => i.row !== row && key(i.name) === key(cleanName))) return false;
+        const oldName = current.name;
+        setCounts((countsState) => {
+          const oldKey = key(oldName);
+          const newKey = key(cleanName);
+          if (!countsState[oldKey] || oldKey === newKey) return countsState;
+          const next = { ...countsState, [newKey]: countsState[oldKey] };
+          delete next[oldKey];
+          return next;
+        });
+        upd((c) => {
+          c.insumos = c.insumos.map((i) => (i.row === row ? { ...i, name: cleanName } : i));
+          c.recetas = c.recetas.map((r) => (key(r.ingrediente) === key(oldName) ? { ...r, ingrediente: cleanName } : r));
+          c.zettle = c.zettle.map((z) => ({
+            ...z,
+            ref: key(z.ref) === key(oldName) ? cleanName : z.ref,
+            omitido: key(z.omitido) === key(oldName) ? cleanName : z.omitido,
+          }));
+          c.params = { ...c.params };
+          for (const f of ['masa', 'nieve', 'crema', 'leche']) {
+            if (key(c.params[f]) === key(oldName)) c.params[f] = cleanName;
+          }
+          c.params.lechas = { ...c.params.lechas };
+          for (const [kind, name] of Object.entries(c.params.lechas)) {
+            if (key(name) === key(oldName)) c.params.lechas[kind] = cleanName;
+          }
+        });
+        return true;
+      },
+      renameCategoria: (oldName, newName) => {
+        const cleanName = String(newName || '').trim();
+        if (!cleanName) return false;
+        if (key(oldName) === key(cleanName)) return true;
+        upd((c) => {
+          c.insumos = c.insumos.map((i) => (key(i.cat) === key(oldName) ? { ...i, cat: cleanName } : i));
+        });
+        return true;
+      },
+      createCategoria: (name) => {
+        const cleanName = String(name || '').trim();
+        if (!cleanName) return false;
+        const exists = model?.categorias?.some((cat) => key(cat) === key(cleanName))
+          || model?.insumos?.some((insumo) => key(insumo.cat) === key(cleanName));
+        if (exists) return false;
+        setModel((m) => ({ ...m, categorias: [...new Set([...(m.categorias || []), cleanName])] }));
+        notify(`Categoría "${cleanName}" creada.`);
+        return true;
+      },
       addInsumo: (data) => {
         let ok = true;
         setModel((m) => {
@@ -77,7 +131,7 @@ export default function App() {
       }),
       removeReceta: (row) => upd((c) => { c.recetas = c.recetas.filter((r) => r.row !== row); }),
     };
-  }, []);
+  }, [model, setCounts]);
 
   const costs = useMemo(() => (model ? computeCosts(model) : null), [model]);
   const sales = useMemo(() => (model && costs && doc ? computeSales(model, costs, doc.lines, salesState) : null), [model, costs, doc, salesState]);
@@ -141,6 +195,7 @@ export default function App() {
         {section === 'menu' && <Menu />}
         {section === 'costos' && <Costos />}
         {section === 'inventario' && <Inventario />}
+        {section === 'monitores' && <Monitores />}
       </main>
       {showExport && <ExportDialog onClose={() => setShowExport(false)} changes={changes} />}
       {toast ? <div className="toast" role="status">{toast}</div> : null}

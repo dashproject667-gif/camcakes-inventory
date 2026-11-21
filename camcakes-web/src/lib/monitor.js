@@ -1,6 +1,7 @@
 // Convierte las hojas del Monitor_Operacion_CamCakes.xlsx en un modelo editable.
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const str = (v) => (v == null || typeof v === 'object' ? '' : String(v));
+const isNumLocal = (v) => typeof v === 'number' && Number.isFinite(v);
 
 export const INS_FIRST = 6, INS_LAST = 90;
 export const REC_FIRST = 6, REC_LAST = 405;
@@ -24,14 +25,55 @@ export function parseMonitor(sheets) {
     lechas: {},
   };
   for (let r = 18; r <= 22; r++) { const k = str(P.get('A' + r)); if (k) params.lechas[k] = str(P.get('B' + r)); }
+  params.crepeKit = [];
+  for (let r = 27; r <= 38; r++) {
+    const name = str(P.get('A' + r)).trim();
+    const qty = num(P.get('B' + r));
+    if (name && qty != null) params.crepeKit.push({ name, qty });
+  }
+  if (!params.crepeKit.length) {
+    params.crepeKit = [
+      { name: 'Charola para crepa', qty: 1 },
+      { name: 'Rollo de bolsas', qty: 1 },
+      { name: 'Caja de tenedores de plastico', qty: 1 },
+      { name: 'Cuchillo de plastico', qty: 1 },
+      { name: 'Servilletas', qty: 2 },
+      { name: 'Vaso y tapa 2oz', qty: 1 },
+    ];
+  }
 
   const insumos = [];
+  const categorias = new Set();
+  for (let r = INS_FIRST; r <= INS_LAST; r++) {
+    const cat = str(I.get('A' + r)).trim();
+    if (cat) categorias.add(cat);
+  }
   for (let r = INS_FIRST; r <= INS_LAST; r++) {
     const name = str(I.get('B' + r)).trim();
     if (!name) continue;
+    const cont = num(I.get('E' + r));
+    const unit = str(I.get('C' + r)) || 'g';
+    const pesoPza = num(I.get('H' + r));
+    const gPres = unit === 'pza' ? (isNumLocal(cont) && isNumLocal(pesoPza) ? cont * pesoPza : null) : (isNumLocal(cont) ? cont : null);
+    const stockIni = num(I.get('O' + r));
+    let stockClosed = null, stockOpen = null;
+    if (isNumLocal(stockIni) && stockIni >= 0) {
+      if (unit === 'pza' && isNumLocal(cont) && cont > 0) {
+        stockClosed = Math.floor(stockIni);
+        const remainder = Math.round((stockIni - stockClosed) * cont * 1e6) / 1e6;
+        stockOpen = remainder > 0 ? remainder : null;
+        if (stockClosed === 0 && stockIni > 0) stockOpen = Math.round(stockIni * cont * 1e6) / 1e6;
+      } else if (isNumLocal(gPres) && gPres > 0) {
+        stockClosed = Math.floor(stockIni);
+        const remainder = Math.round((stockIni - stockClosed) * gPres * 1e6) / 1e6;
+        stockOpen = remainder > 0 ? remainder : null;
+        if (stockClosed === 0 && stockIni > 0) stockOpen = Math.round(stockIni * gPres * 1e6) / 1e6;
+      }
+    }
     insumos.push({
-      row: r, cat: str(I.get('A' + r)), name, unit: str(I.get('C' + r)) || 'g', pres: str(I.get('D' + r)),
-      cont: num(I.get('E' + r)), precio: num(I.get('F' + r)), estado: str(I.get('G' + r)), pesoPza: num(I.get('H' + r)),
+      row: r, cat: str(I.get('A' + r)), name, unit, pres: str(I.get('D' + r)),
+      cont, precio: num(I.get('F' + r)), estado: str(I.get('G' + r)), pesoPza,
+      stockClosed, stockOpen,
       usoMin: num(I.get('K' + r)), usoMax: num(I.get('L' + r)),
       stockIni: num(I.get('O' + r)), compras: num(I.get('P' + r)), stockMin: num(I.get('S' + r)),
       notas: str(I.get('V' + r)), myoMin: num(I.get('W' + r)), myoMax: num(I.get('X' + r)),
@@ -59,7 +101,7 @@ export function parseMonitor(sheets) {
     zettle.push({ row: r, fila: num(Z.get('A' + r)), producto: prod, opcion: str(Z.get('C' + r)).trim(), precio: num(Z.get('D' + r)),
       tipo: str(Z.get('E' + r)), ref: str(Z.get('F' + r)).trim(), omitido: str(Z.get('G' + r)).trim(), leche: str(Z.get('L' + r)).trim(), cached: { costo: num(Z.get('H' + r)) } });
   }
-  return { params, insumos, recetas, productos, zettle };
+  return { params, insumos, recetas, productos, zettle, categorias: [...categorias] };
 }
 
 /** Lee el reporte "Ventas por producto" exportado del POS (Zettle). */
