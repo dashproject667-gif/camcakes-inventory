@@ -59,7 +59,7 @@ El indicador de costo es una referencia para identificar productos cuyo costo oc
 
 ## Costos
 
-En **Costos** puedes revisar y ajustar la información que se usa para calcular el costo de preparación.
+En **Costos** puedes revisar y ajustar la información que se usa para calcular el costo de preparación. Si el Monitor cargado incluye la hoja **Gastos**, también aparece una pestaña para registrar gastos y consultar el punto de equilibrio.
 
 ### Productos
 
@@ -113,6 +113,19 @@ Las ventas que no se pudieron relacionar con un producto no descuentan insumos h
 Para Make Your Own, el interruptor de **Ventas del POS** define si cada línea de relleno también descuenta la base de una crepa (masa, nieve, crema y empaque). Déjalo activado cuando el POS reporte los rellenos y toppings por separado y no reporte otra línea para la base.
 
 En el Excel exportado, la hoja **Ventas** también detecta tipos de leche escritos en la columna de variante; un valor manual en **AF** tiene prioridad. Si el producto tiene otro nombre en el reporte, asígnalo en **F** para que se calcule con su receta.
+
+### Gastos
+
+La pestaña **Gastos** aparece cuando el Monitor cargado ya tiene una hoja con ese nombre. Permite consultar y modificar sus parámetros, gastos fijos, gastos variables, frecuencias y categorías.
+
+- En **Hoja Ventas**, la página calcula con las ventas identificadas del reporte del POS cargado. Si no has cargado el reporte, puedes elegir **Manual** y capturar una venta neta y, opcionalmente, un margen bruto.
+- Los gastos fijos se capturan por monto y frecuencia; la página muestra su equivalente mensual y lo que corresponde a los días del periodo.
+- Los gastos variables se capturan como porcentaje de la venta neta.
+- El punto de equilibrio es la venta neta estimada necesaria para cubrir los gastos fijos y variables.
+- Los botones para agregar gastos muestran renglones vacíos que ya existen en la hoja; no crean filas fuera del formato del Excel.
+- Al exportar, los cambios se escriben solo en las celdas de captura. Las fórmulas y formatos de la hoja se conservan; Excel actualiza sus resultados al abrir el archivo.
+
+Si la pestaña no aparece, el archivo cargado no contiene la hoja **Gastos**. Carga el Monitor que ya la incluye para editarla desde la página.
 
 ### Parámetros
 

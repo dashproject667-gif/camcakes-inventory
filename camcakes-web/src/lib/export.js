@@ -5,6 +5,8 @@ import { isNum } from './format.js';
 const INS_COLS = { cat: 'A', name: 'B', unit: 'C', pres: 'D', cont: 'E', precio: 'F', estado: 'G', pesoPza: 'H', usoMin: 'K', usoMax: 'L', stockIni: 'O', compras: 'P', stockMin: 'S', notas: 'V', myoMin: 'W', myoMax: 'X' };
 const REC_COLS = { producto: 'A', ingrediente: 'B', tipo: 'C', manual: 'D', notas: 'I' };
 const PROD_COLS = { cat: 'A', nombre: 'B', tipo: 'C', kw1: 'D', kw2: 'E', precio: 'F', nieve: 'G', crema: 'H' };
+const EXP_FIXED_COLS = { name: 'A', category: 'B', frequency: 'C', amount: 'D', include: 'E', notes: 'H' };
+const EXP_VARIABLE_COLS = { name: 'A', rate: 'B', include: 'C', notes: 'E' };
 const PARAM_CELLS = { relleno: 'B5', tope: 'B6', iva: 'B7', empaque: 'B8' };
 const PARAM_NAME_CELLS = { masa: 'B9', nieve: 'B10', crema: 'B11', leche: 'B15' };
 const PARAM_LECHE_CELLS = { Entera: 'B18', Deslactosada: 'B19', Avena: 'B20', Almendra: 'B21', Soya: 'B22' };
@@ -36,13 +38,37 @@ function diffRows(origRows, curRows, cols, ops, sheet, extraClear = []) {
 }
 
 export function summarizeChanges(original, model) {
-  const ops = { Insumos: [], Recetas: [], Productos: [], Parametros: [] };
+  const ops = { Insumos: [], Recetas: [], Productos: [], Parametros: [], Gastos: [] };
   const nIns = diffRows(original.insumos, model.insumos, INS_COLS, ops, 'Insumos');
   const nRec = diffRows(original.recetas, model.recetas, REC_COLS, ops, 'Recetas');
   const nProd = diffRows(original.productos, model.productos, PROD_COLS, ops, 'Productos');
   let nPar = 0;
   for (const [f, ref] of Object.entries(PARAM_CELLS)) if (original.params[f] !== model.params[f]) { ops.Parametros.push({ ref, value: model.params[f] }); nPar++; }
-  return { ops, counts: { insumos: nIns, recetas: nRec, productos: nProd, parametros: nPar }, total: nIns + nRec + nProd + nPar };
+  let nExpenses = 0;
+  if (original.expenses && model.expenses) {
+    const old = original.expenses, current = model.expenses;
+    const setIfChanged = (before, after, ref) => {
+      if (val(before) !== val(after)) { ops.Gastos.push({ ref, value: val(after) }); nExpenses++; }
+    };
+    for (const [field, ref] of [['periodDays', 'B5'], ['source', 'B7'], ['manualSales', 'B8'], ['manualMargin', 'B9']]) {
+      setIfChanged(old[field], current[field], ref);
+    }
+    for (const group of ['frequencies', 'categories', 'fixed', 'variable', 'scenarios']) {
+      const before = new Map(old[group].map((item) => [item.row, item]));
+      for (const item of current[group]) {
+        const previous = before.get(item.row) || {};
+        const columns = group === 'frequencies' ? { name: 'J', payments: 'K' }
+          : group === 'categories' ? { name: 'J' }
+            : group === 'fixed' ? EXP_FIXED_COLS
+              : group === 'variable' ? EXP_VARIABLE_COLS : { factor: 'B' };
+        for (const [field, column] of Object.entries(columns)) {
+          setIfChanged(previous[field], item[field], column + item.row);
+        }
+      }
+    }
+  }
+  const counts = { insumos: nIns, recetas: nRec, productos: nProd, parametros: nPar, gastos: nExpenses };
+  return { ops, counts, total: nIns + nRec + nProd + nPar + nExpenses };
 }
 
 /**

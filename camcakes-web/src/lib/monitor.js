@@ -1,4 +1,6 @@
 // Convierte las hojas del Monitor_Operacion_CamCakes.xlsx en un modelo editable.
+import { parseExpenses } from './expenses.js';
+
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const str = (v) => (v == null || typeof v === 'object' ? '' : String(v));
 const isNumLocal = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -101,7 +103,10 @@ export function parseMonitor(sheets) {
     zettle.push({ row: r, fila: num(Z.get('A' + r)), producto: prod, opcion: str(Z.get('C' + r)).trim(), precio: num(Z.get('D' + r)),
       tipo: str(Z.get('E' + r)), ref: str(Z.get('F' + r)).trim(), omitido: str(Z.get('G' + r)).trim(), leche: str(Z.get('L' + r)).trim(), cached: { costo: num(Z.get('H' + r)) } });
   }
-  return { params, insumos, recetas, productos, zettle, categorias: [...categorias] };
+  return {
+    params, insumos, recetas, productos, zettle, categorias: [...categorias],
+    expenses: parseExpenses(sheets.Gastos),
+  };
 }
 
 /** Lee el reporte "Ventas por producto" exportado del POS (Zettle). */

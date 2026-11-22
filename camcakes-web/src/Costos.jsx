@@ -6,8 +6,9 @@ import { AppIcon, Badge, Drawer, Empty, NumInput, Segmented, Stat } from './ui.j
 import { CAT_TITLE } from './Menu.jsx';
 import { money, money4, num, pct, costTone, isNum } from './lib/format.js';
 import { key, myoSelection } from './lib/engine.js';
+import { computeExpenses } from './lib/expenses.js';
 
-const TABS = [['productos', 'Productos'], ['insumos', 'Insumos y precios'], ['recetas', 'Recetas'], ['myo', 'Make Your Own'], ['ventas', 'Ventas del periodo'], ['params', 'Parámetros'], ['sinliga', 'Sin receta']];
+const TABS = [['productos', 'Productos'], ['insumos', 'Insumos y precios'], ['recetas', 'Recetas'], ['myo', 'Make Your Own'], ['ventas', 'Ventas del periodo'], ['gastos', 'Gastos'], ['params', 'Parámetros'], ['sinliga', 'Sin receta']];
 
 export default function Costos() {
   const [tab, setTab] = useState('productos');
@@ -30,11 +31,140 @@ export default function Costos() {
         {tab === 'recetas' && <RecetasTab />}
         {tab === 'myo' && <MyoTab />}
         {tab === 'ventas' && <VentasTab />}
+        {tab === 'gastos' && <GastosTab />}
         {tab === 'params' && <ParamsTab />}
         {tab === 'sinliga' && <SinRecetaTab onOpenRecetas={() => setTab('recetas')} />}
       </div>
       {createPortal(<CostsPrintSheet tab={printTab} />, document.getElementById('print-root'))}
     </section>
+  );
+}
+
+function GastosTab() {
+  const { model, costs, sales, actions } = useContext(AppCtx);
+  const [fixedVisible, setFixedVisible] = useState(null);
+  const [variableVisible, setVariableVisible] = useState(null);
+  const expenses = model.expenses;
+  const summary = useMemo(() => computeExpenses(expenses, costs, sales), [expenses, costs, sales]);
+
+  if (!expenses) return <Empty title="Este Monitor no incluye la hoja Gastos">Carga el archivo de Monitor que contiene la hoja <strong>Gastos</strong> para consultar, editar y exportar sus datos.</Empty>;
+
+  const fixedLast = expenses.fixed.reduce((last, item, index) => (item.name.trim() ? index + 1 : last), 0);
+  const variableLast = expenses.variable.reduce((last, item, index) => (item.name.trim() ? index + 1 : last), 0);
+  const visibleFixed = Math.max(fixedVisible ?? fixedLast + 1, 1);
+  const visibleVariable = Math.max(variableVisible ?? variableLast + 1, 1);
+  const updateExpense = (group, row, patch) => actions.setExpenseRow(group, row, patch);
+  const numField = (value, onChange, label, percent = false) => (
+    <span className="expense-number">
+      <NumInput value={percent ? (isNum(value) ? value * 100 : null) : value}
+        onChange={(v) => onChange(v == null ? null : Math.max(0, percent ? v / 100 : v))}
+        aria-label={label} />
+      {percent ? '%' : null}
+    </span>
+  );
+  const textField = (value, onChange, label) => (
+    <input value={value || ''} onChange={(e) => onChange(e.target.value)} aria-label={label} />
+  );
+  const updateListItem = (group, row, patch) => actions.setExpenses({
+    [group]: expenses[group].map((item) => (item.row === row ? { ...item, ...patch } : item)),
+  });
+  const frequencyByName = new Map(expenses.frequencies.map((frequency) => [frequency.name, frequency.payments]));
+  const status = (item) => !item.name.trim() ? ''
+    : item.include === 'NO' ? 'Excluido'
+      : !isNum(item.amount) ? 'Falta monto'
+        : !frequencyByName.has(item.frequency) ? 'Falta frecuencia' : 'OK';
+
+  return (
+    <>
+      <p className="muted">Captura los gastos del periodo. Las cantidades se guardan en la hoja <strong>Gastos</strong> del Excel; los cálculos del Monitor se actualizan aquí al instante.</p>
+      <div className="params expense-settings">
+        <div className="param"><label><span>Días del periodo</span><NumInput value={expenses.periodDays} onChange={(v) => actions.setExpenses({ periodDays: Math.max(0, v ?? 0) })} aria-label="Días del periodo" /></label><small className="muted">Los gastos fijos se prorratean por día.</small></div>
+        <div className="param"><label><span>Fuente de venta</span><select value={expenses.source} onChange={(e) => actions.setExpenses({ source: e.target.value })}><option>Hoja Ventas</option><option>Manual</option></select></label><small className="muted">Hoja Ventas usa las ventas identificadas del reporte POS cargado en la web.</small></div>
+        <div className="param"><label><span>Venta neta manual</span><NumInput value={expenses.manualSales} disabled={expenses.source !== 'Manual'} onChange={(v) => actions.setExpenses({ manualSales: v == null ? null : Math.max(0, v) })} aria-label="Venta neta manual sin IVA" /></label><small className="muted">Sin IVA; solo se usa con fuente Manual.</small></div>
+        <div className="param"><label><span>Margen bruto manual</span><span className="expense-number"><NumInput value={isNum(expenses.manualMargin) ? expenses.manualMargin * 100 : null} disabled={expenses.source !== 'Manual'} onChange={(v) => actions.setExpenses({ manualMargin: v == null ? null : Math.max(0, v / 100) })} aria-label="Margen bruto manual en porcentaje" />%</span></label><small className="muted">Opcional. Si queda vacío se usa el promedio del menú.</small></div>
+      </div>
+      {expenses.source === 'Hoja Ventas' && !sales && <div className="note warn">Carga el reporte del POS para calcular ventas y utilidad de este periodo; también puedes cambiar la fuente a Manual.</div>}
+      {expenses.source === 'Hoja Ventas' && sales?.costoFaltante > 0 && <div className="note warn">Hay {sales.costoFaltante} unidad(es) vendida(s) sin costo completo; la utilidad calculada puede quedar incompleta.</div>}
+      {expenses.source === 'Hoja Ventas' && sales?.totals.sinReceta > 0 && <div className="note warn">Hay {sales.totals.sinReceta} unidad(es) identificada(s) sin receta; su costo no está incluido en la utilidad calculada.</div>}
+      <div className="expense-lookups">
+        <div>
+          <h3>Frecuencias de pago</h3>
+          <div className="table-wrap"><table className="tbl compact"><thead><tr><th>Frecuencia</th><th className="r">Pagos por año</th></tr></thead>
+            <tbody>{expenses.frequencies.map((item) => <tr key={item.row}><td>{textField(item.name, (name) => updateListItem('frequencies', item.row, { name }), `Frecuencia de pago fila ${item.row}`)}</td><td className="r">{numField(item.payments, (payments) => updateListItem('frequencies', item.row, { payments }), `Pagos por año de ${item.name}`)}</td></tr>)}</tbody>
+          </table></div>
+        </div>
+        <div>
+          <h3>Categorías de gastos fijos</h3>
+          <div className="table-wrap"><table className="tbl compact"><thead><tr><th>Categoría</th></tr></thead>
+            <tbody>{expenses.categories.map((item) => <tr key={item.row}><td>{textField(item.name, (name) => updateListItem('categories', item.row, { name }), `Categoría de gasto fila ${item.row}`)}</td></tr>)}</tbody>
+          </table></div>
+        </div>
+      </div>
+      <div className="stats row">
+        <Stat label="Venta neta" value={money(summary.revenue)} sub="sin IVA" />
+        <Stat label="Utilidad bruta" value={money(summary.grossProfit)} sub={`Margen ${pct(summary.grossMargin)}`} />
+        <Stat label="Gastos fijos" value={money(summary.fixedTotal)} sub={`${money(summary.fixedMonthly)} al mes`} />
+        <Stat label="Gastos variables" value={money(summary.variableTotal)} sub={pct(summary.variableRate)} />
+        <Stat label="Utilidad después de gastos" value={money(summary.profitAfterExpenses)} tone={isNum(summary.profitAfterExpenses) && summary.profitAfterExpenses < 0 ? 'bad' : 'good'} />
+      </div>
+      <div className="stats row">
+        <Stat label="Punto de equilibrio" value={isNum(summary.breakEven) ? money(summary.breakEven) : isNum(summary.marginAfterVariable) ? 'No alcanza' : '—'} sub="venta neta del periodo" />
+        <Stat label="Venta diaria de equilibrio" value={money(summary.dailyBreakEven)} />
+        <Stat label="Avance contra equilibrio" value={pct(summary.breakEvenProgress)} tone={isNum(summary.breakEvenProgress) && summary.breakEvenProgress >= 1 ? 'good' : 'warn'} />
+      </div>
+      <h2>Gastos fijos</h2>
+      <div className="table-wrap">
+        <table className="tbl expense-table">
+          <thead><tr><th>Concepto</th><th>Categoría</th><th>Frecuencia</th><th className="r">Monto por pago</th><th>Incluir</th><th className="r">Mensual</th><th className="r">Periodo</th><th>Notas</th><th>Estado</th><th></th></tr></thead>
+          <tbody>{expenses.fixed.slice(0, visibleFixed).map((item) => {
+            const result = summary.fixed.find((row) => row.row === item.row);
+            return <tr key={item.row}>
+              <td>{textField(item.name, (name) => updateExpense('fixed', item.row, { name }), `Concepto de gasto fijo fila ${item.row}`)}</td>
+              <td><select value={item.category} onChange={(e) => updateExpense('fixed', item.row, { category: e.target.value })} aria-label={`Categoría de ${item.name || 'gasto fijo'}`}><option value="">Sin categoría</option>{expenses.categories.filter((cat) => cat.name).map((cat) => <option key={cat.row} value={cat.name}>{cat.name}</option>)}</select></td>
+              <td><select value={item.frequency} onChange={(e) => updateExpense('fixed', item.row, { frequency: e.target.value })} aria-label={`Frecuencia de ${item.name || 'gasto fijo'}`}><option value="">Sin frecuencia</option>{expenses.frequencies.filter((frequency) => frequency.name).map((frequency) => <option key={frequency.row} value={frequency.name}>{frequency.name}</option>)}</select></td>
+              <td className="r">{numField(item.amount, (amount) => updateExpense('fixed', item.row, { amount }), `Monto de ${item.name || 'gasto fijo'}`)}</td>
+              <td><select value={item.include} onChange={(e) => updateExpense('fixed', item.row, { include: e.target.value })} aria-label={`Incluir ${item.name || 'gasto fijo'}`}><option>SI</option><option>NO</option></select></td>
+              <td className="r">{money(result?.monthly)}</td><td className="r">{money(result?.period)}</td>
+              <td>{textField(item.notes, (notes) => updateExpense('fixed', item.row, { notes }), `Notas de ${item.name || 'gasto fijo'}`)}</td>
+              <td><Badge tone={status(item) === 'OK' || status(item) === 'Excluido' ? 'good' : 'warn'}>{status(item)}</Badge></td>
+              <td><button className="icon-btn" onClick={() => updateExpense('fixed', item.row, { name: '', category: '', frequency: '', amount: null, include: 'SI', notes: '' })} aria-label={`Quitar gasto fijo ${item.name || item.row}`}><AppIcon name="trash" /></button></td>
+            </tr>;
+          })}</tbody>
+        </table>
+      </div>
+      {visibleFixed < expenses.fixed.length && <button className="btn" onClick={() => setFixedVisible(Math.min(visibleFixed + 1, expenses.fixed.length))}>+ Agregar gasto fijo</button>}
+      <div className="table-wrap expense-categories">
+        <table className="tbl compact"><thead><tr><th>Categoría</th><th className="r">Mensual</th><th className="r">En el periodo</th></tr></thead>
+          <tbody>{summary.categoryTotals.map((item) => <tr key={item.name}><td>{item.name}</td><td className="r">{money(item.monthly)}</td><td className="r">{money(item.period)}</td></tr>)}</tbody>
+        </table>
+      </div>
+      <h2>Gastos variables</h2>
+      <p className="muted">Se capturan como porcentaje de la venta neta y cambian conforme a las ventas del periodo.</p>
+      <div className="table-wrap">
+        <table className="tbl expense-table">
+          <thead><tr><th>Concepto</th><th className="r">% de la venta neta</th><th>Incluir</th><th className="r">Monto del periodo</th><th>Notas</th><th></th></tr></thead>
+          <tbody>{expenses.variable.slice(0, visibleVariable).map((item) => {
+            const result = summary.variable.find((row) => row.row === item.row);
+            return <tr key={item.row}>
+              <td>{textField(item.name, (name) => updateExpense('variable', item.row, { name }), `Concepto de gasto variable fila ${item.row}`)}</td>
+              <td className="r">{numField(item.rate, (rate) => updateExpense('variable', item.row, { rate }), `Porcentaje de ${item.name || 'gasto variable'}`, true)}</td>
+              <td><select value={item.include} onChange={(e) => updateExpense('variable', item.row, { include: e.target.value })} aria-label={`Incluir ${item.name || 'gasto variable'}`}><option>SI</option><option>NO</option></select></td>
+              <td className="r">{money(result?.period)}</td>
+              <td>{textField(item.notes, (notes) => updateExpense('variable', item.row, { notes }), `Notas de ${item.name || 'gasto variable'}`)}</td>
+              <td><button className="icon-btn" onClick={() => updateExpense('variable', item.row, { name: '', rate: null, include: 'SI', notes: '' })} aria-label={`Quitar gasto variable ${item.name || item.row}`}><AppIcon name="trash" /></button></td>
+            </tr>;
+          })}</tbody>
+        </table>
+      </div>
+      {visibleVariable < expenses.variable.length && <button className="btn" onClick={() => setVariableVisible(Math.min(visibleVariable + 1, expenses.variable.length))}>+ Agregar gasto variable</button>}
+      <h2>Escenarios de venta</h2>
+      <div className="table-wrap"><table className="tbl compact"><thead><tr><th>Escenario</th><th className="r">% del equilibrio</th><th className="r">Venta neta</th><th className="r">Utilidad bruta</th><th className="r">Gastos fijos</th><th className="r">Gastos variables</th><th className="r">Utilidad final</th></tr></thead>
+        <tbody>{summary.scenarios.map((scenario) => <tr key={scenario.row}>
+          <td>Escenario {scenario.row - 29}</td><td className="r">{numField(expenses.scenarios.find((item) => item.row === scenario.row)?.factor, (factor) => actions.setExpenses({ scenarios: expenses.scenarios.map((item) => item.row === scenario.row ? { ...item, factor } : item) }), `Porcentaje del equilibrio escenario ${scenario.row - 29}`, true)}</td>
+          <td className="r">{money(scenario.revenue)}</td><td className="r">{money(scenario.grossProfit)}</td><td className="r">{money(scenario.fixed)}</td><td className="r">{money(scenario.variable)}</td><td className="r">{money(scenario.profit)}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </>
   );
 }
 
@@ -491,13 +621,14 @@ function SinRecetaTab({ onOpenRecetas }) {
 }
 
 function CostsPrintSheet({ tab }) {
-  const { costs, model } = useContext(AppCtx);
+  const { costs, model, sales } = useContext(AppCtx);
   if (!tab) return null;
+  const expenses = computeExpenses(model.expenses, costs, sales);
   const date = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
   return (
     <div className="print-sheet costs-print-sheet">
       <header>
-        <h1>Camcakes · {tab === 'recetas' ? 'Recetas' : tab === 'sinliga' ? 'Insumos sin receta' : 'Costos'}</h1>
+        <h1>Camcakes · {tab === 'recetas' ? 'Recetas' : tab === 'sinliga' ? 'Insumos sin receta' : tab === 'gastos' ? 'Gastos' : 'Costos'}</h1>
         <p>Generado el {date}</p>
       </header>
       {tab === 'productos' && (
@@ -532,6 +663,33 @@ function CostsPrintSheet({ tab }) {
             <tr key={insumo.row}><td>{insumo.cat}</td><td>{insumo.name}</td><td>{insumo.pres}</td><td className="r">{isNum(insumo.cont) ? `${num(insumo.cont, 1)} ${insumo.unit}` : '—'}</td><td className="r">{money(insumo.precio)}</td><td>{insumo.estado}</td><td className="r">{money4(insumo.costoG)}</td></tr>
           ))}</tbody>
         </table>
+      )}
+      {tab === 'gastos' && expenses && (
+        <>
+          <table>
+            <thead><tr><th>Resultado</th><th className="r">Monto</th></tr></thead>
+            <tbody>
+              <tr><td>Venta neta</td><td className="r">{money(expenses.revenue)}</td></tr>
+              <tr><td>Utilidad bruta</td><td className="r">{money(expenses.grossProfit)}</td></tr>
+              <tr><td>Gastos fijos del periodo</td><td className="r">{money(expenses.fixedTotal)}</td></tr>
+              <tr><td>Gastos variables</td><td className="r">{money(expenses.variableTotal)}</td></tr>
+              <tr><td><strong>Utilidad después de gastos</strong></td><td className="r"><strong>{money(expenses.profitAfterExpenses)}</strong></td></tr>
+              <tr><td>Punto de equilibrio</td><td className="r">{money(expenses.breakEven)}</td></tr>
+            </tbody>
+          </table>
+          <table>
+            <thead><tr><th>Gasto fijo</th><th>Categoría</th><th>Frecuencia</th><th className="r">Monto por pago</th><th className="r">En el periodo</th></tr></thead>
+            <tbody>{expenses.fixed.filter((item) => item.name.trim()).map((item) => (
+              <tr key={item.row}><td>{item.name}</td><td>{item.category}</td><td>{item.frequency}</td><td className="r">{money(item.amount)}</td><td className="r">{money(item.period)}</td></tr>
+            ))}</tbody>
+          </table>
+          <table>
+            <thead><tr><th>Gasto variable</th><th className="r">% de la venta</th><th className="r">En el periodo</th></tr></thead>
+            <tbody>{expenses.variable.filter((item) => item.name.trim()).map((item) => (
+              <tr key={item.row}><td>{item.name}</td><td className="r">{pct(item.rate)}</td><td className="r">{money(item.period)}</td></tr>
+            ))}</tbody>
+          </table>
+        </>
       )}
       {tab === 'sinliga' && (
         <table>

@@ -62,6 +62,12 @@ export default function App() {
     const upd = (fn) => setModel((m) => { const c = { ...m }; fn(c); return c; });
     return {
       setParam: (f, v) => upd((c) => { c.params = { ...c.params, [f]: v }; }),
+      setExpenses: (patch) => upd((c) => { if (c.expenses) c.expenses = { ...c.expenses, ...patch }; }),
+      setExpenseRow: (group, row, patch) => upd((c) => {
+        if (c.expenses && Array.isArray(c.expenses[group])) {
+          c.expenses[group] = c.expenses[group].map((item) => (item.row === row ? { ...item, ...patch } : item));
+        }
+      }),
       setInsumo: (row, patch) => upd((c) => { c.insumos = c.insumos.map((i) => (i.row === row ? { ...i, ...patch } : i)); }),
       renameInsumo: (row, newName) => {
         const cleanName = String(newName || '').trim();

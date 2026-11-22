@@ -31,6 +31,7 @@ export default function ExportDialog({ onClose, changes }) {
           <li><strong>{c.recetas || 0}</strong> líneas de receta modificadas</li>
           <li><strong>{c.productos || 0}</strong> productos con cambios (precio, nieve, crema)</li>
           <li><strong>{c.parametros || 0}</strong> parámetros</li>
+          {c.gastos ? <li><strong>{c.gastos}</strong> celdas de la hoja Gastos</li> : null}
         </ul>
         <label className="check block"><input type="checkbox" checked={close} onChange={(e) => setClose(e.target.checked)} />
           <span><strong>Cerrar periodo:</strong> usar el conteo físico (o el teórico si no contaste) como nuevo stock inicial y vaciar “Compras”. {nCounted ? `Tienes ${nCounted} insumos contados.` : 'Aún no capturas conteo físico.'}</span></label>
