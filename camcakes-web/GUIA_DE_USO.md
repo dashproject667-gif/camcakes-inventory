@@ -82,7 +82,7 @@ Al activar **Mostrar porciones de uso** aparecen campos adicionales para las can
 
 También puedes cambiar directamente el nombre o la categoría de un insumo en su fila. Al renombrar un insumo, la aplicación actualiza automáticamente las recetas, los nombres relacionados de parámetros y las referencias del catálogo Zettle que usan ese insumo.
 
-Para crear una categoría sin asignarla todavía a un insumo, escribe su nombre en **Nueva categoría** y selecciona **Crear categoría**. La categoría quedará disponible en los filtros y en el Excel exportado. Para renombrar una categoría completa, selecciónala y escribe el nuevo nombre en el administrador de categorías.
+Para crear una categoría sin asignarla todavía a un insumo, escribe su nombre en **Nueva categoría** y selecciona **Crear categoría**. La categoría quedará disponible en los filtros y en el Excel exportado. Puedes cambiar la categoría asignada a un insumo desde su fila; esto no renombra la categoría para los demás insumos.
 
 Si falta un precio o una cantidad necesaria, algunos costos pueden aparecer como incompletos. Revisa primero el insumo señalado y su receta.
 

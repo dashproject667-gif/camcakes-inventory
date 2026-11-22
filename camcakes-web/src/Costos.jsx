@@ -261,7 +261,6 @@ function InsumosTab() {
   const { costs, model, actions, notify } = useContext(AppCtx);
   const [cat, setCat] = useState('all'); const [q, setQ] = useState(''); const [onlyEst, setOnlyEst] = useState(false); const [adv, setAdv] = useState(false);
   const [adding, setAdding] = useState(false); const [form, setForm] = useState({ cat: '', name: '', unit: 'g', pres: '', cont: null, precio: null });
-  const [catRename, setCatRename] = useState(''); const [catNewName, setCatNewName] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const cats = [...new Set([...(model.categorias || []), ...costs.ins.map((i) => i.cat)])].filter(Boolean);
   const rows = costs.ins.filter((i) => (cat === 'all' || i.cat === cat) && (!onlyEst || i.estado !== 'Real') && (!q || i.name.toLowerCase().includes(q.toLowerCase())));
@@ -306,25 +305,7 @@ function InsumosTab() {
         >
           + Crear categoría
         </button>
-        <select value={catRename} onChange={(e) => setCatRename(e.target.value)} aria-label="Categoría a renombrar">
-          <option value="">Categoría a renombrar</option>
-          {cats.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <EditableName
-          value={catNewName}
-          onCommit={(name) => {
-            if (!catRename) { notify('Primero selecciona la categoría que quieres renombrar.'); return false; }
-            const ok = actions.renameCategoria(catRename, name);
-            if (!ok) return false;
-            notify(`Categoría "${catRename}" renombrada como "${name}".`);
-            setCatRename(name);
-            setCatNewName('');
-            return true;
-          }}
-          label="Nuevo nombre de categoría"
-          placeholder="Nuevo nombre"
-        />
-        <span className="muted small">Las categorías también pueden escribirse directamente al editar A: Categoría o al agregar un insumo.</span>
+        <span className="muted small">Las categorías también pueden asignarse al editar o agregar un insumo.</span>
       </div>
       <datalist id="inscategories">{cats.map((c) => <option key={c} value={c} />)}</datalist>
       {adding && (

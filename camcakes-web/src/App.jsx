@@ -103,15 +103,6 @@ export default function App() {
         });
         return true;
       },
-      renameCategoria: (oldName, newName) => {
-        const cleanName = String(newName || '').trim();
-        if (!cleanName) return false;
-        if (key(oldName) === key(cleanName)) return true;
-        upd((c) => {
-          c.insumos = c.insumos.map((i) => (key(i.cat) === key(oldName) ? { ...i, cat: cleanName } : i));
-        });
-        return true;
-      },
       createCategoria: (name) => {
         const cleanName = String(name || '').trim();
         if (!cleanName) return false;
