@@ -162,7 +162,7 @@ function VentasPOS() {
           <input className="mini" placeholder="Agregar nombre exacto…" value={newIgn} onChange={(e) => setNewIgn(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addIgn(); }} aria-label="Agregar producto a ignorar" />
           <button className="btn" onClick={addIgn}>Agregar</button>
         </div>
-        <label className="check"><input type="checkbox" checked={salesState.myoBase} onChange={(e) => setSalesState((s) => ({ ...s, myoBase: e.target.checked }))} /> Cada línea de “Crepa Make Your Own” (relleno) descuenta también masa, nieve y crema de 1 crepa</label>
+        <label className="check"><input type="checkbox" checked={salesState.myoBase} onChange={(e) => setSalesState((s) => ({ ...s, myoBase: e.target.checked }))} /> Cada línea de relleno MYO descuenta también masa, nieve, crema y empaque de 1 crepa</label>
         <div className="filepick inline"><span>Reporte cargado: <strong>{docName}</strong></span><label className="btn">Reemplazar DOC<input type="file" accept=".xlsx" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) loadDoc(f); e.target.value = ''; }} /></label></div>
         {errors.doc ? <div className="fp-error">{errors.doc}</div> : null}
       </div>

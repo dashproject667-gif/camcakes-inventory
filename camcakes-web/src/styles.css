@@ -114,6 +114,47 @@ select.est{font-size:12.5px;font-weight:650;border-radius:999px;padding:3px 8px}
 .drawer{width:min(640px,100%);background:var(--bg);height:100%;overflow:auto;padding:20px 24px;box-shadow:-8px 0 30px rgba(0,0,0,.15)}
 .drawer header,.modal header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .modal{background:var(--bg);border-radius:16px;padding:22px 26px;width:min(560px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.menu-import-backdrop{position:fixed;inset:0;z-index:1100;background:rgba(22,28,26,.55);display:grid;place-items:center;padding:20px}
+.menu-import-dialog{background:var(--bg);border-radius:16px;width:min(980px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.28);overflow:hidden}
+.menu-import-header,.menu-import-footer{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line)}
+.menu-import-header h2{margin:0}.menu-import-header p{margin:4px 0 0}.menu-import-footer{border-top:1px solid var(--line);border-bottom:0}
+.menu-import-body{padding:18px 22px;overflow:auto}
+.menu-import-explainer{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:14px}
+.menu-import-explainer p{margin:5px 0;font-size:13px}
+.menu-import-file{margin-right:10px;cursor:pointer}
+.menu-import-summary{display:flex;justify-content:space-between;gap:12px;padding:12px 0 8px}
+.menu-import-category-tools{display:grid;grid-template-columns:1fr minmax(260px,1fr);gap:10px 18px;padding:12px 14px;margin:12px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.menu-import-category-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.menu-import-category-chips .chip{max-width:none;white-space:normal;overflow-wrap:anywhere;cursor:default}
+.menu-import-create-category{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:end}
+.menu-import-create-category label{grid-column:1/-1;color:var(--muted);font-size:12px}
+.menu-import-create-category input{min-width:0}
+.menu-import-category-tools>p{grid-column:1/-1;margin:0}
+.menu-import-list{display:grid;gap:10px}
+.menu-import-item{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.menu-import-product{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.menu-import-match{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;margin:12px 0}
+.menu-import-match label,.menu-import-add-fields label{display:grid;gap:5px;font-size:12px;color:var(--muted);flex:1}
+.menu-import-match select,.menu-import-add-fields select{min-width:0;width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff;color:var(--ink)}
+.menu-import-match p{margin:0}
+.menu-import-match-details{display:grid;gap:8px;min-width:230px}
+.menu-import-match-details .check{font-size:12px}
+.menu-import-actions{display:grid;gap:9px}
+.menu-import-add-fields{display:flex;align-items:flex-end;gap:8px}
+.menu-import-undo{margin-top:10px}
+.menu-import-footer .small{max-width:70%}
+@media(max-width:680px){
+  .menu-import-backdrop{padding:8px}
+  .menu-import-dialog{width:100%;max-height:96vh}
+  .menu-import-header,.menu-import-footer{padding:12px 14px}
+  .menu-import-body{padding:12px 14px}
+  .menu-import-summary,.menu-import-match{align-items:stretch;flex-direction:column}
+  .menu-import-category-tools{grid-template-columns:1fr}
+  .menu-import-create-category{grid-template-columns:1fr}
+  .menu-import-create-category label,.menu-import-category-tools>p{grid-column:auto}
+  .menu-import-add-fields{align-items:stretch;flex-direction:column}
+  .menu-import-product{align-items:flex-start;flex-direction:column}
+}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}.changes{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px 10px 32px;margin:10px 0}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:10px}.kpis div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px}.kpis span{display:block;font-size:11.5px;color:var(--muted)}.kpis strong{font:700 17px var(--serif)}
 .empty{text-align:center;padding:40px 20px;background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius)}

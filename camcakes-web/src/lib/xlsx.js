@@ -90,8 +90,9 @@ export async function patchXlsx(buffer, ops, opts = {}) {
   const { zip, sheets } = await loadParts(buffer);
   const byName = Object.fromEntries(sheets.map((s) => [s.name, s]));
   const ser = new _XMLSerializer();
-  const touched = new Set([...Object.keys(ops), ...Object.keys(opts.clearRanges || {})]);
-  const log = { written: 0, skippedFormula: [] };
+  const formulaSheets = new Set(opts.formulaTransformSheets || []);
+  const touched = new Set([...Object.keys(ops), ...Object.keys(opts.clearRanges || {}), ...formulaSheets]);
+  const log = { written: 0, skippedFormula: [], transformedFormulas: 0 };
 
   const setCell = (doc, sheetData, ref, value, sheetName) => {
     const { row, colN } = splitRef(ref);
@@ -132,6 +133,18 @@ export async function patchXlsx(buffer, ops, opts = {}) {
         for (let r = rg.rows[0]; r <= rg.rows[1]; r++) for (let cn = colToNum(rg.cols[0]); cn <= colToNum(rg.cols[1]); cn++) setCell(doc, sheetData, numToCol(cn) + r, null, sh.name);
       }
       for (const op of ops[sh.name] || []) setCell(doc, sheetData, op.ref, op.value, sh.name);
+      if (formulaSheets.has(sh.name) && typeof opts.transformFormula === 'function') {
+        for (const cell of Array.from(doc.getElementsByTagName('c'))) {
+          const formula = kids(cell, 'f')[0];
+          if (!formula) continue;
+          const current = formula.textContent || '';
+          const next = opts.transformFormula(sh.name, cell.getAttribute('r'), current);
+          if (typeof next === 'string' && next !== current) {
+            formula.textContent = next;
+            log.transformedFormulas++;
+          }
+        }
+      }
     }
     zip.file(sh.path, ser.serializeToString(doc));
   }

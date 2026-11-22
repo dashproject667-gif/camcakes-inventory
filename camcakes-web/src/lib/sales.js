@@ -51,7 +51,15 @@ export function resolveLine(line, model, costs, state, catalog) {
   // 3) categoría del POS
   if (norm(line.categoria) === 'chocolate de temporada') {
     const p = costs.prodByKey.get(key('Chocolate Caliente Especial'));
-    if (p) return { status: 'ok', via: 'categoría', kind: 'prod', producto: p.nombre, tipo: 'Receta completa', omit: '', leche: '' };
+    if (p) return {
+      status: 'ok',
+      via: 'categoría',
+      kind: 'prod',
+      producto: p.nombre,
+      tipo: lecheTipo ? 'Receta + leche' : 'Receta completa',
+      omit: '',
+      leche: lecheTipo,
+    };
   }
   return { status: 'unmatched', why: 'No coincide con ningún producto del Monitor' };
 }
@@ -68,6 +76,12 @@ export function computeSales(model, costs, docLines, state) {
   const myoProd = model.productos.find((p) => p.tipo === 'MYO');
   const myoNieve = (myoProd?.nieve ?? 'SI') === 'SI', myoCrema = (myoProd?.crema ?? 'SI') === 'SI';
   const nieveUso = costs.insOf(params.nieve)?.uso ?? 0, cremaUso = costs.insOf(params.crema)?.uso ?? 0, masaUso = costs.insOf(params.masa)?.uso ?? 0;
+  const addMyoBase = (q) => {
+    add(params.masa, masaUso * q, 'Crepa Make Your Own');
+    if (myoNieve) add(params.nieve, nieveUso * q, 'Crepa Make Your Own');
+    if (myoCrema) add(params.crema, cremaUso * q, 'Crepa Make Your Own');
+    for (const item of params.crepeKit || []) add(item.name, item.qty * q, 'Crepa Make Your Own');
+  };
 
   const rows = []; let costoTotal = 0, costoFaltante = 0;
   const totals = { sinIva: 0, conIva: 0, qty: 0, qtyIgn: 0, sinIvaIgn: 0, qtyUnm: 0, sinIvaUnm: 0, sinReceta: 0 };
@@ -81,13 +95,11 @@ export function computeSales(model, costs, docLines, state) {
     if (res.kind === 'relleno') {
       const ins = costs.insOf(res.insumo);
       add(res.insumo, params.relleno * q, 'Crepa Make Your Own');
+      if (state.myoBase !== false) addMyoBase(q);
       let cu = ins && isNum(ins.costoG) ? params.relleno * ins.costoG : null;
       row.costoUnit = cu;
     } else if (res.kind === 'crepa-base') {
-      add(params.masa, masaUso * q, 'Crepa Make Your Own');
-      if (myoNieve) add(params.nieve, nieveUso * q, 'Crepa Make Your Own');
-      if (myoCrema) add(params.crema, cremaUso * q, 'Crepa Make Your Own');
-      for (const item of params.crepeKit || []) add(item.name, item.qty * q, 'Crepa Make Your Own');
+      addMyoBase(q);
       row.costoUnit = costs.base.masa + (myoNieve ? costs.base.nieve : 0) + (myoCrema ? costs.base.crema : 0) + params.empaque;
     } else if (res.kind === 'topping') {
       const ins = costs.insOf(res.insumo);

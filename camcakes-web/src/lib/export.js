@@ -4,13 +4,22 @@ import { isNum } from './format.js';
 
 const INS_COLS = { cat: 'A', name: 'B', unit: 'C', pres: 'D', cont: 'E', precio: 'F', estado: 'G', pesoPza: 'H', usoMin: 'K', usoMax: 'L', stockIni: 'O', compras: 'P', stockMin: 'S', notas: 'V', myoMin: 'W', myoMax: 'X' };
 const REC_COLS = { producto: 'A', ingrediente: 'B', tipo: 'C', manual: 'D', notas: 'I' };
-const PROD_COLS = { precio: 'F', nieve: 'G', crema: 'H' };
+const PROD_COLS = { cat: 'A', nombre: 'B', tipo: 'C', kw1: 'D', kw2: 'E', precio: 'F', nieve: 'G', crema: 'H' };
 const PARAM_CELLS = { relleno: 'B5', tope: 'B6', iva: 'B7', empaque: 'B8' };
 const PARAM_NAME_CELLS = { masa: 'B9', nieve: 'B10', crema: 'B11', leche: 'B15' };
 const PARAM_LECHE_CELLS = { Entera: 'B18', Deslactosada: 'B19', Avena: 'B20', Almendra: 'B21', Soya: 'B22' };
 const CREPE_KIT_FIRST_ROW = 27;
 const CREPE_KIT_LAST_ROW = 38;
 const val = (v) => (v === '' || v === undefined ? null : v);
+
+export function inferMilkFromSalesVariant(sheet, ref, formula) {
+  const match = /^Z(\d+)$/.exec(ref || '');
+  if (sheet !== 'Ventas' || !match || +match[1] < 7 || +match[1] > 506) return formula;
+  const row = match[1];
+  if (!formula.includes(`AF${row}`) || formula.includes(`SEARCH("Deslactosada",C${row})`)) return formula;
+  const milk = `IF(AF${row}<>"",AF${row},IF(ISNUMBER(SEARCH("Deslactosada",C${row})),"Deslactosada",IF(ISNUMBER(SEARCH("Avena",C${row})),"Avena",IF(ISNUMBER(SEARCH("Almendra",C${row})),"Almendra",IF(ISNUMBER(SEARCH("Soya",C${row})),"Soya","Entera")))))`;
+  return formula.replaceAll(`AF${row}`, milk);
+}
 
 function diffRows(origRows, curRows, cols, ops, sheet, extraClear = []) {
   const o = new Map(origRows.map((r) => [r.row, r])); const c = new Map(curRows.map((r) => [r.row, r]));
@@ -112,6 +121,10 @@ export async function buildMonitor(buffer, original, model, opts = {}) {
     for (const [row, v] of byRow) { ops.Insumos.push({ ref: 'O' + row, value: v }); ops.Insumos.push({ ref: 'P' + row, value: null }); }
   }
   if (opts.clearVentas) clearRanges.Ventas = [{ rows: [7, 506], cols: ['A', 'S'] }, { rows: [7, 506], cols: ['AE', 'AF'] }];
-  const res = await patchXlsx(buffer, ops, { clearRanges });
+  const res = await patchXlsx(buffer, ops, {
+    clearRanges,
+    formulaTransformSheets: ['Ventas'],
+    transformFormula: inferMilkFromSalesVariant,
+  });
   return { ...res, closed };
 }

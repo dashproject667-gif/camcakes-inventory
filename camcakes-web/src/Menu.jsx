@@ -1,8 +1,9 @@
 import React, { useContext, useMemo, useState } from 'react';
 import { AppCtx } from './App.jsx';
 import ProductDetail, { variantsOf, toneLabel } from './ProductDetail.jsx';
-import { Badge, Drawer, Stat } from './ui.jsx';
+import { AppIcon, Badge, Drawer, Stat } from './ui.jsx';
 import { money, money0, pct, costTone, isNum } from './lib/format.js';
+import MenuImport from './MenuImport.jsx';
 
 export const CAT_ORDER = ['Clásica', 'Especial', 'MYO', 'Café', 'No coffee', 'Premium', 'Malteada'];
 export const CAT_TITLE = { Clásica: 'Crepas clásicas', Especial: 'Crepas especiales', MYO: 'Make Your Own', Café: 'Café', 'No coffee': 'No coffee', Premium: 'Latte premium', Malteada: 'Malteadas' };
@@ -14,6 +15,7 @@ export default function Menu() {
   const [cat, setCat] = useState('all');
   const [showCost, setShowCost] = useState(true);
   const [open, setOpen] = useState(null);
+  const [showImport, setShowImport] = useState(false);
   const goal = 0.35;
 
   const groups = useMemo(() => {
@@ -33,6 +35,7 @@ export default function Menu() {
     <section>
       <div className="section-head">
         <div><h1>Menú</h1><p className="muted">Lo que se vende, a qué precio y cómo se prepara.</p></div>
+        <button className="btn" onClick={() => setShowImport(true)}><AppIcon name="file" /> Importar menú oficial</button>
         <div className="stats">
           <Stat label="Productos en menú" value={costs.prods.length} />
           <Stat label="Costo promedio" value={pct(avgPct)} sub="sobre precio neto" tone={costTone(avgPct, goal)} />
@@ -84,6 +87,7 @@ export default function Menu() {
         </div>
       ))}
       <Drawer open={!!open} onClose={() => setOpen(null)} title={open?.nombre || ''}>{open ? <ProductDetail product={open} goal={goal} /> : null}</Drawer>
+      {showImport && <MenuImport onClose={() => setShowImport(false)} />}
     </section>
   );
 }

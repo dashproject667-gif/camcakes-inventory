@@ -41,6 +41,20 @@ Esta sección sirve para consultar los productos que se venden.
 - Activa o desactiva **Mostrar costos** para ocultar o ver el costo y el porcentaje que representa respecto al precio neto.
 - Selecciona un producto para ver su precio, receta, costo estimado y variantes del punto de venta, si las hay.
 
+### Actualizar el menú desde el Excel oficial
+
+1. En **Menú**, selecciona **Importar menú oficial** y carga el archivo `.xlsx` descargado del sistema oficial.
+2. La página agrupa las variantes por producto y sugiere coincidencias usando el nombre, precio y categoría. La sugerencia no modifica nada por sí sola.
+3. Para cada producto, elige una acción:
+   - **Vincular y actualizar precio**: conserva el nombre y la receta usados por el Monitor; actualiza el precio base. Si también quieres cambiar la categoría, activa esa opción y elige una categoría.
+   - **Agregar como nuevo**: agrega el nombre, precio, categoría y tipo elegidos. El producto queda sin receta; complétala después en **Costos → Recetas**.
+   - **Descartar**: no incorpora ese producto.
+4. Los precios de las variantes se muestran para consulta. Se usa como precio base el de la variante con leche entera, si existe; de lo contrario, se usa el primer precio del archivo.
+5. Exporta el Monitor para guardar los cambios aprobados. Agregar un producto no crea automáticamente su receta ni sus variantes del POS.
+6. La página muestra las categorías encontradas en el archivo. También puedes crear una categoría propia en esta pantalla; para guardarla en el Excel, asígnala a un producto que agregues o a uno vinculado y exporta el Monitor.
+
+El producto **Crepa Make Your Own** puede aparecer con precio **$0** en el archivo oficial porque se usa para agregar rellenos y toppings. Al vincularlo con el MYO existente, la página conserva su precio de menú del Monitor.
+
 El indicador de costo es una referencia para identificar productos cuyo costo ocupa una parte alta del precio. No sustituye una revisión de precios y gastos del negocio.
 
 ## Costos
@@ -94,7 +108,11 @@ Si los toppings seleccionados superan el límite, la calculadora reduce sus cant
 
 Después de cargar el reporte del punto de venta, aquí puedes consultar las ventas identificadas, su costo calculado y su utilidad estimada para el periodo del archivo.
 
-Las ventas que no se pudieron relacionar con un producto no descuentan insumos hasta que se revisen en **Inventario → Ventas del POS**. Los resultados dependen de que los precios y las recetas estén completos.
+Las ventas que no se pudieron relacionar con un producto no descuentan insumos hasta que se revisen en **Inventario → Ventas del POS**. Las variantes de leche del reporte se usan para ajustar el costo y mover el consumo de leche entera a la leche elegida.
+
+Para Make Your Own, el interruptor de **Ventas del POS** define si cada línea de relleno también descuenta la base de una crepa (masa, nieve, crema y empaque). Déjalo activado cuando el POS reporte los rellenos y toppings por separado y no reporte otra línea para la base.
+
+En el Excel exportado, la hoja **Ventas** también detecta tipos de leche escritos en la columna de variante; un valor manual en **AF** tiene prioridad. Si el producto tiene otro nombre en el reporte, asígnalo en **F** para que se calcule con su receta.
 
 ### Parámetros
 

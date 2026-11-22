@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { readXlsx } from './lib/xlsx.js';
-import { parseMonitor, parseDoc, INS_FIRST, INS_LAST, REC_FIRST, REC_LAST } from './lib/monitor.js';
+import { parseMonitor, parseDoc, INS_FIRST, INS_LAST, REC_FIRST, REC_LAST, PROD_FIRST, PROD_LAST } from './lib/monitor.js';
 import { computeCosts, key, norm } from './lib/engine.js';
 import { computeSales, buildInventory, DEFAULT_IGNORED } from './lib/sales.js';
 import { summarizeChanges } from './lib/export.js';
@@ -24,11 +24,15 @@ export default function App() {
   const [model, setModel] = useState(initial?.model || null);
   const [doc, setDoc] = useState(initial?.doc || null);
   const [docName, setDocName] = useState(initial?.docName || '');
+  const [officialMenu, setOfficialMenu] = useState(initial?.officialMenu || []);
+  const [officialMenuName, setOfficialMenuName] = useState(initial?.officialMenuName || '');
+  const [officialMenuDecisions, setOfficialMenuDecisions] = useState(initial?.officialMenuDecisions || {});
+  const [officialMenuCategories, setOfficialMenuCategories] = useState(initial?.officialMenuCategories || []);
   const [errors, setErrors] = useState({});
   const [section, setSection] = useState(initial?.section || 'menu');
   const [showExport, setShowExport] = useState(false);
   const [salesState, setSalesState] = useState(initial?.salesState
-    ? { ...initial.salesState, ignored: new Set(initial.salesState.ignored) }
+    ? { ...initial.salesState, ignored: new Set(initial.salesState.ignored), myoBase: initial.salesState.myoBase !== false }
     : { ignored: new Set(DEFAULT_IGNORED.map(norm)), overrides: {}, myoBase: true });
   const [counts, setCounts] = useState(initial?.counts || {});
   const [excluded, setExcluded] = useState(new Set(initial?.excluded || []));
@@ -43,6 +47,7 @@ export default function App() {
       const m = parseMonitor(await readXlsx(buf));
       bufferRef.current = buf;
       setOriginal(structuredClone(m)); setModel(m); setMonitorName(file.name); setErrors((e) => ({ ...e, monitor: '' })); setCounts({});
+      setOfficialMenu([]); setOfficialMenuName(''); setOfficialMenuDecisions({}); setOfficialMenuCategories([]);
     } catch (e) { setErrors((x) => ({ ...x, monitor: e.message || 'No pude leer el archivo.' })); }
   };
   const loadDoc = async (file) => {
@@ -122,6 +127,31 @@ export default function App() {
         return ok;
       },
       setProducto: (row, patch) => upd((c) => { c.productos = c.productos.map((p) => (p.row === row ? { ...p, ...patch } : p)); }),
+      addProducto: (data) => {
+        let ok = true;
+        setModel((m) => {
+          const used = new Set(m.productos.map((p) => p.row));
+          let row = null;
+          for (let r = PROD_FIRST; r <= PROD_LAST; r++) if (!used.has(r)) { row = r; break; }
+          if (row === null || m.productos.some((p) => key(p.nombre) === key(data.nombre))) { ok = false; return m; }
+          return { ...m, productos: [...m.productos, {
+            row, cat: '', nombre: '', tipo: 'Especial', kw1: '', kw2: '', precio: null,
+            nieve: 'SI', crema: 'SI', cached: {}, ...data,
+          }] };
+        });
+        return ok;
+      },
+      removeProducto: (row) => {
+        let removed = false;
+        setModel((m) => {
+          const product = m.productos.find((p) => p.row === row);
+          if (!product || m.recetas.some((r) => key(r.producto) === key(product.nombre))
+            || m.zettle.some((z) => key(z.ref) === key(product.nombre))) return m;
+          removed = true;
+          return { ...m, productos: m.productos.filter((p) => p.row !== row) };
+        });
+        return removed;
+      },
       setReceta: (row, patch) => upd((c) => { c.recetas = c.recetas.map((r) => (r.row === row ? { ...r, ...patch } : r)); }),
       addReceta: (data) => setModel((m) => {
         const used = new Set(m.recetas.map((r) => r.row)); let row = null;
@@ -148,12 +178,12 @@ export default function App() {
     if (!model || !original || !bufferRef.current) return;
     const result = saveSession({
       monitorName, original, model, buffer: bufferRef.current, doc, docName,
-      section, salesState, counts, excluded,
+      section, salesState, counts, excluded, officialMenu, officialMenuName, officialMenuDecisions, officialMenuCategories,
     });
     setPersistenceError(result.error);
-  }, [monitorName, original, model, doc, docName, section, salesState, counts, excluded]);
+  }, [monitorName, original, model, doc, docName, section, salesState, counts, excluded, officialMenu, officialMenuName, officialMenuDecisions, officialMenuCategories]);
 
-  const ctx = { model, original, costs, sales, inventory, doc, docName, actions, salesState, setSalesState, counts, setCounts, excluded, setExcluded, notify, setSection, loadDoc, errors, bufferRef };
+  const ctx = { model, original, costs, sales, inventory, doc, docName, actions, salesState, setSalesState, counts, setCounts, excluded, setExcluded, notify, setSection, loadDoc, errors, bufferRef, officialMenu, setOfficialMenu, officialMenuName, setOfficialMenuName, officialMenuDecisions, setOfficialMenuDecisions, officialMenuCategories, setOfficialMenuCategories };
 
   if (!model) {
     return (
