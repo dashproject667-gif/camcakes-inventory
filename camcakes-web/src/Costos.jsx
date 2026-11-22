@@ -6,7 +6,8 @@ import { AppIcon, Badge, Drawer, Empty, NumInput, Segmented, Stat } from './ui.j
 import { CAT_TITLE } from './Menu.jsx';
 import { money, money4, num, pct, costTone, isNum } from './lib/format.js';
 import { key, myoSelection } from './lib/engine.js';
-import { computeExpenses } from './lib/expenses.js';
+import { computeExpenses, parsePeriodDays } from './lib/expenses.js';
+import { buildRecipeLookup } from './lib/recipeLookup.js';
 
 const TABS = [['productos', 'Productos'], ['insumos', 'Insumos y precios'], ['recetas', 'Recetas'], ['myo', 'Make Your Own'], ['ventas', 'Ventas del periodo'], ['gastos', 'Gastos'], ['params', 'Parámetros'], ['sinliga', 'Sin receta']];
 
@@ -41,11 +42,12 @@ export default function Costos() {
 }
 
 function GastosTab() {
-  const { model, costs, sales, actions } = useContext(AppCtx);
+  const { model, costs, sales, doc, actions } = useContext(AppCtx);
   const [fixedVisible, setFixedVisible] = useState(null);
   const [variableVisible, setVariableVisible] = useState(null);
   const expenses = model.expenses;
-  const summary = useMemo(() => computeExpenses(expenses, costs, sales), [expenses, costs, sales]);
+  const posPeriodDays = parsePeriodDays(doc?.meta.periodo);
+  const summary = useMemo(() => computeExpenses(expenses, costs, sales, posPeriodDays), [expenses, costs, sales, posPeriodDays]);
 
   if (!expenses) return <Empty title="Este Monitor no incluye la hoja Gastos">Carga el archivo de Monitor que contiene la hoja <strong>Gastos</strong> para consultar, editar y exportar sus datos.</Empty>;
 
@@ -86,6 +88,7 @@ function GastosTab() {
       {expenses.source === 'Hoja Ventas' && !sales && <div className="note warn">Carga el reporte del POS para calcular ventas y utilidad de este periodo; también puedes cambiar la fuente a Manual.</div>}
       {expenses.source === 'Hoja Ventas' && sales?.costoFaltante > 0 && <div className="note warn">Hay {sales.costoFaltante} unidad(es) vendida(s) sin costo completo; la utilidad calculada puede quedar incompleta.</div>}
       {expenses.source === 'Hoja Ventas' && sales?.totals.sinReceta > 0 && <div className="note warn">Hay {sales.totals.sinReceta} unidad(es) identificada(s) sin receta; su costo no está incluido en la utilidad calculada.</div>}
+      {doc && !posPeriodDays && <div className="note warn">No pude determinar los días del periodo desde las fechas del reporte POS; la columna de periodo POS quedará vacía.</div>}
       <div className="expense-lookups">
         <div>
           <h3>Frecuencias de pago</h3>
@@ -108,6 +111,9 @@ function GastosTab() {
         <Stat label="Utilidad después de gastos" value={money(summary.profitAfterExpenses)} tone={isNum(summary.profitAfterExpenses) && summary.profitAfterExpenses < 0 ? 'bad' : 'good'} />
       </div>
       <div className="stats row">
+        <Stat label="Gastos fijos del POS" value={money(summary.fixedPosTotal)} sub={posPeriodDays ? `${posPeriodDays} días · ${doc?.meta.periodo}` : 'Carga un POS con periodo identificable'} />
+      </div>
+      <div className="stats row">
         <Stat label="Punto de equilibrio" value={isNum(summary.breakEven) ? money(summary.breakEven) : isNum(summary.marginAfterVariable) ? 'No alcanza' : '—'} sub="venta neta del periodo" />
         <Stat label="Venta diaria de equilibrio" value={money(summary.dailyBreakEven)} />
         <Stat label="Avance contra equilibrio" value={pct(summary.breakEvenProgress)} tone={isNum(summary.breakEvenProgress) && summary.breakEvenProgress >= 1 ? 'good' : 'warn'} />
@@ -115,7 +121,7 @@ function GastosTab() {
       <h2>Gastos fijos</h2>
       <div className="table-wrap">
         <table className="tbl expense-table">
-          <thead><tr><th>Concepto</th><th>Categoría</th><th>Frecuencia</th><th className="r">Monto por pago</th><th>Incluir</th><th className="r">Mensual</th><th className="r">Periodo</th><th>Notas</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Concepto</th><th>Categoría</th><th>Frecuencia</th><th className="r">Monto por pago</th><th>Incluir</th><th className="r">Mensual</th><th className="r">Periodo capturado</th><th className="r">Periodo POS<br /><small>{posPeriodDays ? `${posPeriodDays} días` : 'Sin periodo'}</small></th><th>Notas</th><th>Estado</th><th></th></tr></thead>
           <tbody>{expenses.fixed.slice(0, visibleFixed).map((item) => {
             const result = summary.fixed.find((row) => row.row === item.row);
             return <tr key={item.row}>
@@ -124,7 +130,7 @@ function GastosTab() {
               <td><select value={item.frequency} onChange={(e) => updateExpense('fixed', item.row, { frequency: e.target.value })} aria-label={`Frecuencia de ${item.name || 'gasto fijo'}`}><option value="">Sin frecuencia</option>{expenses.frequencies.filter((frequency) => frequency.name).map((frequency) => <option key={frequency.row} value={frequency.name}>{frequency.name}</option>)}</select></td>
               <td className="r">{numField(item.amount, (amount) => updateExpense('fixed', item.row, { amount }), `Monto de ${item.name || 'gasto fijo'}`)}</td>
               <td><select value={item.include} onChange={(e) => updateExpense('fixed', item.row, { include: e.target.value })} aria-label={`Incluir ${item.name || 'gasto fijo'}`}><option>SI</option><option>NO</option></select></td>
-              <td className="r">{money(result?.monthly)}</td><td className="r">{money(result?.period)}</td>
+              <td className="r">{money(result?.monthly)}</td><td className="r">{money(result?.period)}</td><td className="r">{money(result?.periodPos)}</td>
               <td>{textField(item.notes, (notes) => updateExpense('fixed', item.row, { notes }), `Notas de ${item.name || 'gasto fijo'}`)}</td>
               <td><Badge tone={status(item) === 'OK' || status(item) === 'Excluido' ? 'good' : 'warn'}>{status(item)}</Badge></td>
               <td><button className="icon-btn" onClick={() => updateExpense('fixed', item.row, { name: '', category: '', frequency: '', amount: null, include: 'SI', notes: '' })} aria-label={`Quitar gasto fijo ${item.name || item.row}`}><AppIcon name="trash" /></button></td>
@@ -134,8 +140,8 @@ function GastosTab() {
       </div>
       {visibleFixed < expenses.fixed.length && <button className="btn" onClick={() => setFixedVisible(Math.min(visibleFixed + 1, expenses.fixed.length))}>+ Agregar gasto fijo</button>}
       <div className="table-wrap expense-categories">
-        <table className="tbl compact"><thead><tr><th>Categoría</th><th className="r">Mensual</th><th className="r">En el periodo</th></tr></thead>
-          <tbody>{summary.categoryTotals.map((item) => <tr key={item.name}><td>{item.name}</td><td className="r">{money(item.monthly)}</td><td className="r">{money(item.period)}</td></tr>)}</tbody>
+        <table className="tbl compact"><thead><tr><th>Categoría</th><th className="r">Mensual</th><th className="r">Periodo capturado</th><th className="r">Periodo POS</th></tr></thead>
+          <tbody>{summary.categoryTotals.map((item) => <tr key={item.name}><td>{item.name}</td><td className="r">{money(item.monthly)}</td><td className="r">{money(item.period)}</td><td className="r">{money(item.periodPos)}</td></tr>)}</tbody>
         </table>
       </div>
       <h2>Gastos variables</h2>
@@ -387,56 +393,102 @@ function InsumosTab() {
 function RecetasTab() {
   const { costs, actions, model } = useContext(AppCtx);
   const [sel, setSel] = useState(costs.prods.find((p) => p.tipo !== 'MYO')?.nombre || '');
+  const [view, setView] = useState('edit');
   const p = costs.prodByKey.get(key(sel));
   const [add, setAdd] = useState({ ing: '', tipo: 'Ingrediente', manual: null });
-  if (!p) return <Empty title="Sin productos">El Monitor no tiene productos.</Empty>;
+  if (!costs.prods.length) return <Empty title="Sin productos">El Monitor no tiene productos.</Empty>;
   const insNames = costs.ins.map((i) => i.name);
   const submit = () => {
-    if (!costs.insOf(add.ing)) return;
+    if (!p || !costs.insOf(add.ing)) return;
     actions.addReceta({ producto: p.nombre, ingrediente: costs.insOf(add.ing).name, tipo: add.tipo, manual: add.manual });
     setAdd({ ing: '', tipo: 'Ingrediente', manual: null });
   };
   return (
     <>
-      <div className="toolbar">
-        <select value={sel} onChange={(e) => setSel(e.target.value)} aria-label="Producto">
-          {costs.prods.filter((x) => x.tipo !== 'MYO').map((x) => <option key={x.row} value={x.nombre}>{x.nombre}</option>)}
-        </select>
-        <div className="inline-fields">
-          <label>Precio de menú <NumInput value={p.precio} onChange={(v) => actions.setProducto(p.row, { precio: v })} /></label>
-          {p.tipo !== 'Bebida' && <>
-            <label>Nieve <select value={p.nieve} onChange={(e) => actions.setProducto(p.row, { nieve: e.target.value })}><option>SI</option><option>NO</option></select></label>
-            <label>Crema <select value={p.crema} onChange={(e) => actions.setProducto(p.row, { crema: e.target.value })}><option>SI</option><option>NO</option></select></label></>}
+      <Segmented value={view} onChange={setView} label="Recetas" options={[{ value: 'edit', label: 'Editar receta' }, { value: 'lookup', label: 'Consultar por insumo' }]} />
+      {view === 'lookup' ? <RecipeLookup model={model} costs={costs} /> : !p ? <Empty title="Sin productos">El Monitor no tiene productos con receta editable.</Empty> : <>
+        <div className="toolbar">
+          <select value={sel} onChange={(e) => setSel(e.target.value)} aria-label="Producto">
+            {costs.prods.filter((x) => x.tipo !== 'MYO').map((x) => <option key={x.row} value={x.nombre}>{x.nombre}</option>)}
+          </select>
+          <div className="inline-fields">
+            <label>Precio de menú <NumInput value={p.precio} onChange={(v) => actions.setProducto(p.row, { precio: v })} /></label>
+            {p.tipo !== 'Bebida' && <>
+              <label>Nieve <select value={p.nieve} onChange={(e) => actions.setProducto(p.row, { nieve: e.target.value })}><option>SI</option><option>NO</option></select></label>
+              <label>Crema <select value={p.crema} onChange={(e) => actions.setProducto(p.row, { crema: e.target.value })}><option>SI</option><option>NO</option></select></label></>}
+          </div>
         </div>
+        <div className="note">Deja “Cantidad manual” vacío para usar la porción estándar del insumo (o los {model.params.relleno} g de relleno repartidos). Escribe un número solo si en ESTE producto lleva otra cantidad.</div>
+        <div className="table-wrap">
+          <table className="tbl compact">
+            <thead><tr><th>Ingrediente</th><th>Tipo</th><th className="r">Estándar</th><th className="r">Cantidad manual</th><th className="r">Usado</th><th className="r">Costo</th><th /></tr></thead>
+            <tbody>
+              {p.lines.map((l) => {
+                const std = costs.insOf(l.ingrediente)?.uso;
+                return (
+                  <tr key={l.row} className={l.estado !== 'OK' ? 'bad-row' : ''}>
+                    <td>{l.ingrediente}{l.estado === 'No encontrado' ? <Badge tone="bad">No existe en Insumos</Badge> : null}</td><td className="muted">{l.tipo}</td>
+                    <td className="r muted">{l.tipo === 'Relleno' ? 'reparto' : num(std, 1)}</td>
+                    <td className="r"><NumInput value={l.manual} onChange={(v) => actions.setReceta(l.row, { manual: v })} aria-label={`Cantidad manual de ${l.ingrediente}`} /></td>
+                    <td className="r">{num(l.gramos, 1)}</td><td className="r">{isNum(l.costo) ? money(l.costo) : <Badge tone="warn">{l.estado}</Badge>}</td>
+                    <td><button className="icon-btn" onClick={() => actions.removeReceta(l.row)} aria-label={`Quitar ${l.ingrediente}`}><AppIcon name="trash" /></button></td>
+                  </tr>
+                );
+              })}
+              <tr className="total"><td colSpan={5}>Costo total (incluye nieve, crema y empaque si aplican)</td><td className="r">{money(p.total)}</td><td /></tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="form-row">
+          <input list="insnames" placeholder="Agregar ingrediente (nombre del insumo)" value={add.ing} onChange={(e) => setAdd({ ...add, ing: e.target.value })} aria-label="Ingrediente a agregar" />
+          <datalist id="insnames">{insNames.map((n) => <option key={n} value={n} />)}</datalist>
+          <select value={add.tipo} onChange={(e) => setAdd({ ...add, tipo: e.target.value })} aria-label="Tipo"><option>Ingrediente</option><option>Topping</option><option>Relleno</option><option>Empaque</option></select>
+          <NumInput value={add.manual} onChange={(v) => setAdd({ ...add, manual: v })} placeholder="Cantidad manual" aria-label="Cantidad manual" />
+          <button className="btn" onClick={submit} disabled={!costs.insOf(add.ing)}>+ Agregar</button>
+        </div>
+      </>}
+    </>
+  );
+}
+
+function RecipeLookup({ model, costs }) {
+  const [ingredientName, setIngredientName] = useState('');
+  const [search, setSearch] = useState('');
+  const rows = useMemo(() => buildRecipeLookup(model, costs), [model, costs]);
+  const ingredientNames = [...new Set(costs.ins.map((item) => item.name))].sort((a, b) => a.localeCompare(b));
+  const visibleRows = rows.filter((row) => (
+    (!ingredientName || row.ingredient === ingredientName)
+    && (!search || `${row.product} ${row.ingredient} ${row.type}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+  ));
+  return (
+    <>
+      <p className="muted">Selecciona un insumo para consultar en qué productos se usa y en qué cantidad. También se incluyen nieve, crema y empaque cuando el Monitor los agrega automáticamente.</p>
+      <div className="toolbar">
+        <select value={ingredientName} onChange={(e) => setIngredientName(e.target.value)} aria-label="Filtrar recetas por insumo">
+          <option value="">Todos los insumos</option>
+          {ingredientNames.map((name) => <option key={name}>{name}</option>)}
+        </select>
+        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar producto o insumo" aria-label="Buscar producto o insumo" />
       </div>
-      <div className="note">Deja “Cantidad manual” vacío para usar la porción estándar del insumo (o los {model.params.relleno} g de relleno repartidos). Escribe un número solo si en ESTE producto lleva otra cantidad.</div>
-      <div className="table-wrap">
-        <table className="tbl compact">
-          <thead><tr><th>Ingrediente</th><th>Tipo</th><th className="r">Estándar</th><th className="r">Cantidad manual</th><th className="r">Usado</th><th className="r">Costo</th><th /></tr></thead>
-          <tbody>
-            {p.lines.map((l) => {
-              const std = costs.insOf(l.ingrediente)?.uso;
-              return (
-                <tr key={l.row} className={l.estado !== 'OK' ? 'bad-row' : ''}>
-                  <td>{l.ingrediente}{l.estado === 'No encontrado' ? <Badge tone="bad">No existe en Insumos</Badge> : null}</td><td className="muted">{l.tipo}</td>
-                  <td className="r muted">{l.tipo === 'Relleno' ? 'reparto' : num(std, 1)}</td>
-                  <td className="r"><NumInput value={l.manual} onChange={(v) => actions.setReceta(l.row, { manual: v })} aria-label={`Cantidad manual de ${l.ingrediente}`} /></td>
-                  <td className="r">{num(l.gramos, 1)}</td><td className="r">{isNum(l.costo) ? money(l.costo) : <Badge tone="warn">{l.estado}</Badge>}</td>
-                  <td><button className="icon-btn" onClick={() => actions.removeReceta(l.row)} aria-label={`Quitar ${l.ingrediente}`}><AppIcon name="trash" /></button></td>
-                </tr>
-              );
-            })}
-            <tr className="total"><td colSpan={5}>Costo total (incluye nieve, crema y empaque si aplican)</td><td className="r">{money(p.total)}</td><td /></tr>
-          </tbody>
-        </table>
+      <div className="stats row">
+        <Stat label="Insumos consultados" value={new Set(visibleRows.map((row) => row.ingredient)).size} />
+        <Stat label="Productos relacionados" value={new Set(visibleRows.map((row) => row.product)).size} />
       </div>
-      <div className="form-row">
-        <input list="insnames" placeholder="Agregar ingrediente (nombre del insumo)" value={add.ing} onChange={(e) => setAdd({ ...add, ing: e.target.value })} aria-label="Ingrediente a agregar" />
-        <datalist id="insnames">{insNames.map((n) => <option key={n} value={n} />)}</datalist>
-        <select value={add.tipo} onChange={(e) => setAdd({ ...add, tipo: e.target.value })} aria-label="Tipo"><option>Ingrediente</option><option>Topping</option><option>Relleno</option><option>Empaque</option></select>
-        <NumInput value={add.manual} onChange={(v) => setAdd({ ...add, manual: v })} placeholder="Cantidad manual" aria-label="Cantidad manual" />
-        <button className="btn" onClick={submit} disabled={!costs.insOf(add.ing)}>+ Agregar</button>
-      </div>
+      <div className="note">Make Your Own es variable según los rellenos y toppings elegidos; consulta sus cantidades en <strong>Costos → Make Your Own</strong>.</div>
+      {!visibleRows.length ? <Empty title={ingredientName && !search ? 'Este insumo no aparece en recetas' : 'Sin coincidencias'}>No hay productos relacionados con este filtro.</Empty> : (
+        <div className="table-wrap">
+          <table className="tbl compact">
+            <thead><tr><th>Insumo</th><th>Producto relacionado</th><th>Tipo</th><th className="r">Cantidad por producto</th><th>Cómo se define</th></tr></thead>
+            <tbody>{visibleRows.map((row) => (
+              <tr key={row.id}>
+                <td><strong>{row.ingredient}</strong></td><td>{row.product}</td><td className="muted">{row.type}</td>
+                <td className="r">{isNum(row.quantity) ? `${num(row.quantity, 3)} ${row.unit || 'unid.'}` : <Badge tone="warn">Sin cantidad</Badge>}</td>
+                <td className="muted">{row.source}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
     </>
   );
 }
@@ -621,9 +673,9 @@ function SinRecetaTab({ onOpenRecetas }) {
 }
 
 function CostsPrintSheet({ tab }) {
-  const { costs, model, sales } = useContext(AppCtx);
+  const { costs, model, sales, doc } = useContext(AppCtx);
   if (!tab) return null;
-  const expenses = computeExpenses(model.expenses, costs, sales);
+  const expenses = computeExpenses(model.expenses, costs, sales, parsePeriodDays(doc?.meta.periodo));
   const date = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
   return (
     <div className="print-sheet costs-print-sheet">
@@ -678,10 +730,11 @@ function CostsPrintSheet({ tab }) {
             </tbody>
           </table>
           <table>
-            <thead><tr><th>Gasto fijo</th><th>Categoría</th><th>Frecuencia</th><th className="r">Monto por pago</th><th className="r">En el periodo</th></tr></thead>
+            <thead><tr><th>Gasto fijo</th><th>Categoría</th><th>Frecuencia</th><th className="r">Monto por pago</th><th className="r">Periodo capturado</th><th className="r">Periodo POS ({expenses.posPeriodDays ?? '—'} días)</th></tr></thead>
             <tbody>{expenses.fixed.filter((item) => item.name.trim()).map((item) => (
-              <tr key={item.row}><td>{item.name}</td><td>{item.category}</td><td>{item.frequency}</td><td className="r">{money(item.amount)}</td><td className="r">{money(item.period)}</td></tr>
+              <tr key={item.row}><td>{item.name}</td><td>{item.category}</td><td>{item.frequency}</td><td className="r">{money(item.amount)}</td><td className="r">{money(item.period)}</td><td className="r">{money(item.periodPos)}</td></tr>
             ))}</tbody>
+            <tfoot><tr><td colSpan="4"><strong>Total de gastos fijos</strong></td><td className="r"><strong>{money(expenses.fixedTotal)}</strong></td><td className="r"><strong>{money(expenses.fixedPosTotal)}</strong></td></tr></tfoot>
           </table>
           <table>
             <thead><tr><th>Gasto variable</th><th className="r">% de la venta</th><th className="r">En el periodo</th></tr></thead>

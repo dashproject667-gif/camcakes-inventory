@@ -90,6 +90,8 @@ Si falta un precio o una cantidad necesaria, algunos costos pueden aparecer como
 
 Selecciona un producto para ver y editar sus ingredientes.
 
+- En **Consultar por insumo** puedes elegir o buscar un insumo y ver en qué productos se usa y en qué cantidad. La consulta incluye nieve, crema y empaque cuando se agregan automáticamente.
+- **Make Your Own** es variable; sus cantidades dependen de la combinación elegida y se consultan en su pestaña.
 - **Cantidad manual vacía**: usa la cantidad estándar del insumo o el reparto establecido para los rellenos.
 - **Cantidad manual con un valor**: usa esa cantidad solo para el producto seleccionado.
 - **Agregar**: añade a la receta un insumo que ya exista.
@@ -120,6 +122,7 @@ La pestaña **Gastos** aparece cuando el Monitor cargado ya tiene una hoja con e
 
 - En **Hoja Ventas**, la página calcula con las ventas identificadas del reporte del POS cargado. Si no has cargado el reporte, puedes elegir **Manual** y capturar una venta neta y, opcionalmente, un margen bruto.
 - Los gastos fijos se capturan por monto y frecuencia; la página muestra su equivalente mensual y lo que corresponde a los días del periodo.
+- Además, muestra el prorrateo de gastos fijos para los días indicados por el periodo del reporte POS, sin reemplazar el cálculo del periodo capturado. Las fechas deben poder leerse en el reporte.
 - Los gastos variables se capturan como porcentaje de la venta neta.
 - El punto de equilibrio es la venta neta estimada necesaria para cubrir los gastos fijos y variables.
 - Los botones para agregar gastos muestran renglones vacíos que ya existen en la hoja; no crean filas fuera del formato del Excel.

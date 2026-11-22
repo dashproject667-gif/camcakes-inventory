@@ -2,6 +2,23 @@ const isNum = (value) => typeof value === 'number' && Number.isFinite(value);
 const num = (value) => (isNum(value) ? value : null);
 const text = (value) => (value == null || typeof value === 'object' ? '' : String(value));
 
+export function parsePeriodDays(period) {
+  const datePattern = /(\d{1,2})\/(\d{1,2})\/(\d{4})|(\d{4})-(\d{1,2})-(\d{1,2})/g;
+  const dates = [...String(period || '').matchAll(datePattern)].map((match) => {
+    const day = Number(match[1] || match[6]);
+    const month = Number(match[2] || match[5]);
+    const year = Number(match[3] || match[4]);
+    const timestamp = Date.UTC(year, month - 1, day);
+    const date = new Date(timestamp);
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+    return timestamp;
+  }).filter((timestamp) => timestamp !== null);
+  if (!dates.length) return null;
+  const first = dates[0], last = dates[dates.length - 1];
+  if (last < first) return null;
+  return Math.floor((last - first) / 86400000) + 1;
+}
+
 export function parseExpenses(sheet) {
   if (!sheet) return null;
 
@@ -53,7 +70,7 @@ export function parseExpenses(sheet) {
   };
 }
 
-export function computeExpenses(expenses, costs, sales) {
+export function computeExpenses(expenses, costs, sales, posPeriodDays = null) {
   if (!expenses) return null;
 
   const averageMargin = (() => {
@@ -77,10 +94,16 @@ export function computeExpenses(expenses, costs, sales) {
     const payments = frequencyByName.get(item.frequency);
     const active = Boolean(item.name.trim()) && item.include !== 'NO';
     const monthly = active && isNum(item.amount) && isNum(payments) ? item.amount * payments / 12 : 0;
-    return { ...item, monthly, period: monthly * 12 / 365 * expenses.periodDays };
+    return {
+      ...item,
+      monthly,
+      period: monthly * 12 / 365 * expenses.periodDays,
+      periodPos: isNum(posPeriodDays) ? monthly * 12 / 365 * posPeriodDays : null,
+    };
   });
   const fixedTotal = fixed.reduce((sum, item) => sum + item.period, 0);
   const fixedMonthly = fixed.reduce((sum, item) => sum + item.monthly, 0);
+  const fixedPosTotal = isNum(posPeriodDays) ? fixed.reduce((sum, item) => sum + item.periodPos, 0) : null;
   const variable = expenses.variable.map((item) => {
     const active = Boolean(item.name.trim()) && item.include !== 'NO' && isNum(item.rate);
     return { ...item, period: active && isNum(revenue) ? item.rate * revenue : 0 };
@@ -95,11 +118,13 @@ export function computeExpenses(expenses, costs, sales) {
     name,
     monthly: fixed.filter((item) => item.category === name).reduce((sum, item) => sum + item.monthly, 0),
     period: fixed.filter((item) => item.category === name).reduce((sum, item) => sum + item.period, 0),
+    periodPos: isNum(posPeriodDays) ? fixed.filter((item) => item.category === name).reduce((sum, item) => sum + item.periodPos, 0) : null,
   }));
   const otherCategory = {
     name: 'Sin categoría / otra',
     monthly: fixedMonthly - categoryTotals.reduce((sum, item) => sum + item.monthly, 0),
     period: fixedTotal - categoryTotals.reduce((sum, item) => sum + item.period, 0),
+    periodPos: isNum(posPeriodDays) ? fixedPosTotal - categoryTotals.reduce((sum, item) => sum + item.periodPos, 0) : null,
   };
   categoryTotals.push(otherCategory);
 
@@ -112,6 +137,8 @@ export function computeExpenses(expenses, costs, sales) {
     fixed,
     fixedTotal,
     fixedMonthly,
+    fixedPosTotal,
+    posPeriodDays: isNum(posPeriodDays) ? posPeriodDays : null,
     variable,
     variableRate,
     variableTotal,
